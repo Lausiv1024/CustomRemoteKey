@@ -1,4 +1,5 @@
-﻿using System;
+﻿using CustomRemoteKey.Networking;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -20,9 +21,25 @@ namespace CustomRemoteKey
     /// </summary>
     public partial class MainWindow : Window
     {
+        Server MainServer;
+
         public MainWindow()
         {
             InitializeComponent();
+
+            MainServer = new Server();
+
+            MainServer.Init();
+        }
+
+        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            if (!MainServer.Closed) e.Cancel = true;
+        }
+
+        private void Window_KeyDown(object sender, KeyEventArgs e)
+        {
+            MainServer.Close();
         }
     }
 }

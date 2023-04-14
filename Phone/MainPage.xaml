@@ -2,5 +2,11 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="Phone.MainPage">
-
+    <Grid>
+        <Grid.RowDefinitions>
+            
+        </Grid.RowDefinitions>
+        <Button x:Name="Button1" Text="1" Margin="8"/>
+        <Button x:Name="Button2" Text="2" Margin="8"/>
+    </Grid>
 </ContentPage>
