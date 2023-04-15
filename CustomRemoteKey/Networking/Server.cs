@@ -11,7 +11,7 @@ namespace CustomRemoteKey.Networking
 {
     internal class Server
     {
-        public const int port = 65430;
+        public const int port = 60001;
 
         public ManualResetEvent SocketEvent = new ManualResetEvent(false);
 
@@ -44,7 +44,6 @@ namespace CustomRemoteKey.Networking
         {
             while (true)
             {
-                
                 SocketEvent.Reset();
                 Socket.BeginAccept(new AsyncCallback(OnConnectRequest), Socket);
                 SocketEvent.WaitOne();

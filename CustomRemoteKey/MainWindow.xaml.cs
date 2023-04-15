@@ -26,10 +26,15 @@ namespace CustomRemoteKey
         public MainWindow()
         {
             InitializeComponent();
-
             MainServer = new Server();
+            //try
+            //{
+            //    MainServer.Init();
+            //} catch
+            //{
 
-            MainServer.Init();
+            //}
+            
         }
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)

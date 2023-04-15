@@ -1,12 +1,18 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             x:Class="Phone.MainPage">
-    <Grid>
+             x:Class="Phone.MainPage" Title="Controls" Disappearing="ContentPage_Disappearing" Appearing="ContentPage_Appearing">
+    <Grid x:Name="AllParent">
         <Grid.RowDefinitions>
-            
+            <RowDefinition Height="80"/>
+            <RowDefinition/>
         </Grid.RowDefinitions>
-        <Button x:Name="Button1" Text="1" Margin="8"/>
-        <Button x:Name="Button2" Text="2" Margin="8"/>
+
+        <Grid x:Name="ProfileSelect">
+
+        </Grid>
+        <Grid Grid.Row="1" x:Name="ControlButtonDeck" Margin="5,30,5,5">
+            
+        </Grid>
     </Grid>
 </ContentPage>
