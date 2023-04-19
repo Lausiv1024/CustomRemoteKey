@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Net.Sockets;
 using System.Net;
 using System.Threading;
+using System.Diagnostics;
 
 namespace CustomRemoteKey.Networking
 {
@@ -32,9 +33,6 @@ namespace CustomRemoteKey.Networking
         {
             Closed = false;
             Socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            Socket.Bind(Endpoint);
-            Socket.Listen(10);
-
             Main = new Thread(new ThreadStart(Round));
             Main.Start();
             Console.WriteLine("Socket Thread started.");
@@ -42,43 +40,58 @@ namespace CustomRemoteKey.Networking
 
         void Round()
         {
-            while (true)
+            try
             {
-                SocketEvent.Reset();
-                Socket.BeginAccept(new AsyncCallback(OnConnectRequest), Socket);
-                SocketEvent.WaitOne();
+                Socket.Bind(Endpoint);
+                Socket.Listen(10);
+                while (true)
+                {
+                    SocketEvent.Reset();
+                    Thread.Sleep(10);
+                    Socket.BeginAccept(new AsyncCallback(OnConnectRequest), Socket);
+                    SocketEvent.WaitOne();
+                }
+            } catch(Exception ex)
+            {
+                Debug.WriteLine(ex.ToString());
             }
+            
         }
 
         void OnConnectRequest(IAsyncResult ar)
         {
+            Thread.Sleep(10);
             SocketEvent.Set();
+            if (Closed) return;
+
             Socket listener =(Socket) ar.AsyncState;
             Socket handler = listener.EndAccept(ar);//ここでObjectDisposedExceptionが出る
-            StateObject obj = new StateObject();
-            obj.workingSocket = handler;
-            handler.BeginReceive(obj.buffer, 0, StateObject.BUFFER_SIZE, 0,
-                new AsyncCallback(ReadCallback), obj);
+            StateObject state = new StateObject();
+            state.workingSocket = handler;
+            handler.BeginReceive(state.buffer, 0, StateObject.BUFFER_SIZE, 0,
+                new AsyncCallback(ReadCallback), state);
         }
 
         void ReadCallback(IAsyncResult ar)
         {
-            StateObject state = ar.AsyncState as StateObject;
+            StateObject state = (StateObject) ar.AsyncState;
             Socket handler = state.workingSocket;
             int readSize = handler.EndReceive(ar);
+
             if (readSize < 1)
             {
                 return;
             }
-            byte[] buffer = new byte[readSize];
-            Array.Copy(state.buffer, buffer, readSize);
-            string decodedText = Encoding.UTF8.GetString(buffer);
+
+            byte[] bb = new byte[readSize];
+            Array.Copy(state.buffer, bb, readSize);
+            string decodedText = Encoding.UTF8.GetString(bb);
             if (decodedText == "ConTes<EOM>")
             {
-                buffer = Encoding.UTF8.GetBytes("OK<EOM>");
+                bb = Encoding.UTF8.GetBytes("OK<EOM>");
             }else
-                buffer = Encoding.UTF8.GetBytes("Test<EOM>");
-            handler.BeginSend(buffer, 0, buffer.Length, 0, new AsyncCallback(WriteCallback), state);
+                bb = Encoding.UTF8.GetBytes("Test<EOM>");
+            handler.BeginSend(bb, 0, bb.Length, 0, new AsyncCallback(WriteCallback), state);
         }
 
         void WriteCallback(IAsyncResult ar)
@@ -98,7 +111,7 @@ namespace CustomRemoteKey.Networking
 
         public class StateObject
         {
-            public Socket workingSocket;
+            public Socket workingSocket { get; set; }
             public const int BUFFER_SIZE = 1024;
             internal byte[] buffer = new byte[BUFFER_SIZE];
         }

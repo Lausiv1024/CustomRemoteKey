@@ -23,28 +23,31 @@ namespace CustomRemoteKey
     {
         Server MainServer;
 
+        Server a = null;
+
         public MainWindow()
         {
             InitializeComponent();
             MainServer = new Server();
-            //try
-            //{
-            //    MainServer.Init();
-            //} catch
-            //{
+            try
+            {
+                MainServer.Init();
+            } catch
+            {
 
-            //}
-            
+            }
+
         }
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            if (!MainServer.Closed) e.Cancel = true;
+            //if (!MainServer.Closed) e.Cancel = true;
+            MainServer.Close();
         }
 
         private void Window_KeyDown(object sender, KeyEventArgs e)
         {
-            MainServer.Close();
+            
         }
     }
 }

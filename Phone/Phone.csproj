@@ -12,10 +12,10 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 
 		<!-- Display name -->
-		<ApplicationTitle>Phone</ApplicationTitle>
+		<ApplicationTitle>CustomRemoteKey</ApplicationTitle>
 
 		<!-- App Identifier -->
-		<ApplicationId>com.companyname.phone</ApplicationId>
+		<ApplicationId>lausiv1024.customremotekey</ApplicationId>
 		<ApplicationIdGuid>00b5b725-4973-48af-93e4-cee2dc98f6c3</ApplicationIdGuid>
 
 		<!-- Versions -->
