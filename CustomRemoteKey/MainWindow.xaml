@@ -4,9 +4,55 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:CustomRemoteKey"
+        xmlns:tb="http://www.hardcodet.net/taskbar"
         mc:Ignorable="d" Closing="Window_Closing" KeyDown="Window_KeyDown"
-        Title="MainWindow" Height="450" Width="800">
+        xmlns:ui="http://schemas.modernwpf.com/2019"
+        ui:WindowHelper.UseModernWindowStyle="True" ResizeMode="CanMinimize"
+        Title="CustomRemoteKey Desktop" Height="600" Width="800">
     <Grid>
-        
+        <tb:TaskbarIcon TrayMouseDoubleClick="TaskbarIcon_TrayMouseDoubleClick">
+            <tb:TaskbarIcon.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Name="Close" Header="閉じる" Click="Close_Click"/>
+                </ContextMenu>
+            </tb:TaskbarIcon.ContextMenu>
+        </tb:TaskbarIcon>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition/>
+                <ColumnDefinition/>
+            </Grid.ColumnDefinitions>
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="80"/>
+                    <RowDefinition/>
+                </Grid.RowDefinitions>
+                <Grid Margin="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition/>
+                        <ColumnDefinition/>
+                        <ColumnDefinition/>
+                        <ColumnDefinition/>
+                        <ColumnDefinition/>
+                        <ColumnDefinition/>
+                    </Grid.ColumnDefinitions>
+                    <Button Content="1" Click="OnProfileButtonClicked" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Margin="10"/>
+                    <Button Content="2" Grid.Column="1" Click="OnProfileButtonClicked" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Margin="10"/>
+                    <Button Content="3" Grid.Column="2" Click="OnProfileButtonClicked" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Margin="10"/>
+                    <Button Content="4" Grid.Column="3" Click="OnProfileButtonClicked" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Margin="10"/>
+                    <Button Content="5" Grid.Column="4" Click="OnProfileButtonClicked" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Margin="10"/>
+                    <Button Content="6" Grid.Column="5" Click="OnProfileButtonClicked" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Margin="10"/>
+                </Grid>
+                <Grid x:Name="Buttons" Grid.Row="1" Margin="10">
+                    
+                </Grid>
+            </Grid>
+            <ui:SimpleStackPanel Grid.Column="1" Margin="10">
+                
+                <TextBlock x:Name="ProfileName" Text="ボタン名"/>
+                <TextBox x:Name="ProfName" Text="AAAA"/>
+            </ui:SimpleStackPanel>
+        </Grid>
     </Grid>
 </Window>

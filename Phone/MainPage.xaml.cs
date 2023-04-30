@@ -1,4 +1,10 @@
-﻿namespace Phone
+﻿
+using System.Diagnostics;
+using System.Net.Sockets;
+using System.Text;
+using System;
+
+namespace Phone
 {
     public partial class MainPage : ContentPage
     {
@@ -9,12 +15,22 @@
 
         private int ProfileMode = 0;//そのうちデスクトップ側が全部管理するようになるんだ
 
+        TcpClient Client = new TcpClient();
+
+        bool IsConnected = false;
+
+        int tickCount;
+
+        string host = "localhost";
+        private const int PORT = 60001;
+        
+
         public MainPage()
         {
             InitializeComponent();
 
-            AllParent.RowDefinitions[0].Height = DeviceDisplay.Current.MainDisplayInfo.Width /
-                (ProfileCount * 3);
+            //AllParent.RowDefinitions[0].Height = DeviceDisplay.Current.MainDisplayInfo.Width /
+            //    (ProfileCount * 3);
 
             for (int i = 0; i < ProfileCount; i++)
             {
@@ -50,6 +66,61 @@
             Grid.SetRow(label, ButtonCountY);
             Grid.SetColumnSpan(label, ButtonCountX);
             ControlButtonDeck.Children.Add(label);
+
+            new Timer((state) =>
+            {
+                if (IsConnected)
+                {
+                    Dispatcher.Dispatch(() => Title = "Controls - Connected");
+                    tickCount++;
+                    try
+                    {
+                        if (tickCount  % 10 == 0)
+                        {
+                            if (!Client.Connected)
+                            {
+                                IsConnected = false;
+                                return;
+                            }
+                            Client.Client.Send(Encoding.UTF8.GetBytes("ConTes<EOM>"));
+                        }
+                    } catch
+                    {
+
+                    }
+                    return;
+                }
+                try
+                {
+                    Client.Connect(host, PORT);
+                    IsConnected = true;
+                } catch(Exception ex)
+                {
+                    if (ex.GetType() == typeof(SocketException))
+                    {
+                        Dispatcher.Dispatch(() =>
+                        {
+                            Title = "Controls - Not Connected";
+                        });
+                    }
+                }
+                
+            }, null, new TimeSpan(0), TimeSpan.FromMilliseconds(1000));
+        }
+
+        private void OnConnected(object sender, EventArgs e)
+        {
+
+        }
+
+        private void OnDisconnected(object sender, EventArgs e)
+        {
+
+        }
+
+        private void OnReceiveData(object sender, EventArgs e)
+        {
+
         }
 
         private Button GetControlButton(int column, int row)
@@ -87,7 +158,11 @@
 
         private void ContentPage_Disappearing(object sender, EventArgs e)
         {
+#if ANDROID
             DeviceDisplay.Current.KeepScreenOn = false;
+            if (Client.Connected)
+                Client.Close();
+#endif
         }
 
         private void ContentPage_Appearing(object sender, EventArgs e)
