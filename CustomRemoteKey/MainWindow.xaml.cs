@@ -1,4 +1,5 @@
-﻿using CustomRemoteKey.Networking;
+﻿using CustomRemoteKey.Behaviours;
+using CustomRemoteKey.Networking;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,16 +23,29 @@ namespace CustomRemoteKey
     /// </summary>
     public partial class MainWindow : Window
     {
-        Server MainServer;
+        public static MainWindow Instance { get; private set; }
+        internal Server MainServer { get; private set; }
 
         Server a = null;
 
         private const int ButtonCountX = 4;
         private const int ButtonCountY = 5;
+        Style ButtonDefault;
+
+        int currentProfileMode = 0;
+        int selectedButtonX = -1, selectedButtonY = -1;
+
+        bool NotSelected => selectedButtonX == -1 && selectedButtonY == -1;
+
+        //現在設定中のデバイス
+        int currentDevice = -1;
+
+        List<DeviceProperty> devices = new List<DeviceProperty>();
 
         public MainWindow()
         {
             InitializeComponent();
+            
             this.Hide();
 #if DEBUG
             this.Show();
@@ -67,16 +81,80 @@ namespace CustomRemoteKey
                         var a = Buttons.Children.Cast<Button>();
                         foreach (var b in a)
                         {
-                            b.Style = (Style) FindResource("ButtonBackground");
+                            b.Style = ButtonDefault;
                         }
                         
                         button.Style =(Style) FindResource("AccentButtonStyle");
                         Console.WriteLine("Button Clicked Row : {0} Column : {1}", Grid.GetRow(button), Grid.GetColumn(button));
+                        selectedButtonX = Grid.GetColumn(button);
+                        selectedButtonY = Grid.GetRow(button);
+                        var d = devices[currentDevice];
+                        
+                        ProfName.Text = d.ButtonName[currentProfileMode, selectedButtonX + selectedButtonY * 4];
+                        setUISelectionFromBehaviour(d.Behaviours[currentProfileMode, selectedButtonX + selectedButtonY * 4]);
                     };
                     Buttons.Children.Add(but);
+                    ButtonDefault = but.Style;
                     count++;
                 }
             }
+            devices.Add(new DeviceProperty() { Id = Guid.NewGuid(), Name = "Sample"});
+
+            SelectDevice.ContextMenu = new ContextMenu();
+            SelectDevice.Click += (s, e) => SelectDevice.ContextMenu.IsOpen = true;
+            var item = new MenuItem();
+            item.Header = "デバイスの追加";
+            item.Click += (s, e) =>
+            {
+                MainServer.AcceptingNewConnection = true;
+                var dialog = new AddDevice();
+                dialog.ShowDialog();
+            };
+            SelectDevice.ContextMenu.Items.Add(item);
+            currentDevice = 0;
+            foreach (var device in devices)
+            {
+                AddNewDevice(device);
+            }
+            if (currentDevice >= 0)
+            {
+                SelectDevice.Content = devices[currentDevice].Name;
+                LoadProfile();
+            }
+
+            MainServer.OnDeviceAdded += (s, e) =>
+            {
+                var newDevice = new DeviceProperty();
+                newDevice.Id = e.DeviceId;
+                newDevice.Name = e.DeviceName;
+                devices.Add(newDevice);
+                Dispatcher.Invoke(() => AddNewDevice(newDevice));
+            };
+
+            Instance = this;
+        }
+
+        private void AddNewDevice(DeviceProperty device)
+        {
+            var d = new MenuItem();
+            d.Header = device.Name;
+            d.Click += (s, e) =>
+            {
+                var item12 = (MenuItem)s;
+                SelectDevice.Content = item12.Header;
+            };
+            SelectDevice.ContextMenu.Items.Add(d);
+        }
+
+        private void LoadProfile()
+        {
+            for (int i = 0; i < 20; i++)
+            {
+                GetControlButton(i % 4, i / 4).Content =
+                 devices[currentDevice].ButtonName[currentProfileMode, i];
+            }
+            if (selectedButtonX < 0 || selectedButtonY < 0) return;
+            ProfName.Text = devices[currentDevice].ButtonName[currentProfileMode, selectedButtonX + selectedButtonY * 4];
         }
 
         private Button GetControlButton(int column, int row)
@@ -97,13 +175,16 @@ namespace CustomRemoteKey
 
         private void OnProfileButtonClicked(object sender, RoutedEventArgs e)
         {
-
+            Button but  = (Button) sender;
+            int profileIndex = Grid.GetColumn(but);
+            currentProfileMode = profileIndex;
+            Console.WriteLine("Profile {0}", profileIndex);
+            LoadProfile();
         }
 
         private async void Window_KeyDown(object sender, KeyEventArgs e)
         {
             await Task.Delay(3000);
-            WinAPI.SendInputKeyPress(System.Windows.Forms.Keys.Enter);
         }
 
         private void Close_Click(object sender, RoutedEventArgs e)
@@ -111,6 +192,51 @@ namespace CustomRemoteKey
             MainServer.Close();
             Thread.Sleep(80);
             Application.Current.Shutdown();
+        }
+
+        private void ProfName_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (selectedButtonX < 0 || selectedButtonY < 0) return;
+            var button = GetControlButton(selectedButtonX, selectedButtonY);
+            button.Content = ((TextBox) sender).Text;
+            devices[currentDevice].ButtonName[currentProfileMode, selectedButtonX + selectedButtonY * 4] = (string)button.Content;
+        }
+
+        private void Profiles_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (NotSelected) return;
+            var behaviour = GetBehaviour(Profiles.SelectedIndex);
+            devices[currentDevice].Behaviours[currentProfileMode, selectedButtonX + selectedButtonY * 4] = behaviour;
+            updateSettingUI(behaviour);
+        }
+
+        private BehaviourBase GetBehaviour(int index)
+        {
+            switch (index)
+            {
+                case 1:
+                    return new InputHotKey();
+                case 2:
+                    return new PlaySound();
+            }
+            return null;
+        }
+
+        private void setUISelectionFromBehaviour(BehaviourBase behaviour)
+        {
+            if (behaviour is null)
+                Profiles.SelectedIndex = 0;
+            else if (behaviour is InputHotKey)
+                Profiles.SelectedIndex = 1;
+            else if (behaviour is PlaySound)
+                Profiles.SelectedIndex = 2;
+            updateSettingUI(behaviour);
+        }
+
+        private void updateSettingUI(BehaviourBase behaviour)
+        {
+            BehaviourContext.Children.Clear();
+            behaviour?.DeploySettingUI(BehaviourContext);
         }
 
         private void TaskbarIcon_TrayMouseDoubleClick(object sender, RoutedEventArgs e)

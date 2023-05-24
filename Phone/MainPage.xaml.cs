@@ -169,5 +169,10 @@ namespace Phone
         {
             DeviceDisplay.Current.KeepScreenOn = true;
         }
+
+        private async void ToolbarItem_Clicked(object sender, EventArgs e)
+        {
+            await Navigation.PushAsync(new SettingPage());
+        }
     }
 }

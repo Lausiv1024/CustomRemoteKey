@@ -60,6 +60,13 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="Behaviours\BehaviourBase.cs" />
+    <Compile Include="Behaviours\InputHotKey.cs" />
+    <Compile Include="Behaviours\PlaySound.cs" />
+    <Compile Include="Behaviours\Registry.cs" />
+    <Compile Include="DeviceProperty.cs" />
+    <Compile Include="Event\Args\DeviceAddedEventArgs.cs" />
+    <Compile Include="Settings.cs" />
     <Compile Include="WinAPI.cs" />
     <Page Include="AddDevice.xaml">
       <SubType>Designer</SubType>
@@ -111,6 +118,9 @@
     </PackageReference>
     <PackageReference Include="ModernWpfUI">
       <Version>0.9.6</Version>
+    </PackageReference>
+    <PackageReference Include="Newtonsoft.Json">
+      <Version>13.0.3</Version>
     </PackageReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

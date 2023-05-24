@@ -7,6 +7,9 @@ using System.Net.Sockets;
 using System.Net;
 using System.Threading;
 using System.Diagnostics;
+using System.Security.Cryptography;
+using Windows.Devices.Usb;
+using CustomRemoteKey.Event.Args;
 
 namespace CustomRemoteKey.Networking
 {
@@ -22,6 +25,12 @@ namespace CustomRemoteKey.Networking
 
         private Thread Main;
 
+        public event EventHandler<DeviceAddedEventArgs> OnDeviceAdded;
+
+        public bool AcceptingNewConnection = false;
+        public string currentAccessKey { private get; set; }
+
+
         public bool Closed { get; private set; }
 
         public Server()
@@ -29,7 +38,7 @@ namespace CustomRemoteKey.Networking
             Endpoint = new IPEndPoint(IPAddress.Any, port);
         }
 
-        public void Init()
+        internal void Init()
         {
             Closed = false;
             Socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -65,7 +74,7 @@ namespace CustomRemoteKey.Networking
             if (Closed) return;
 
             Socket listener =(Socket) ar.AsyncState;
-            Socket handler = listener.EndAccept(ar);//ここでObjectDisposedExceptionが出る
+            Socket handler = listener.EndAccept(ar);
             StateObject state = new StateObject();
             state.workingSocket = handler;
             handler.BeginReceive(state.buffer, 0, StateObject.BUFFER_SIZE, 0,
@@ -76,8 +85,13 @@ namespace CustomRemoteKey.Networking
         {
             StateObject state = (StateObject) ar.AsyncState;
             Socket handler = state.workingSocket;
-            int readSize = handler.EndReceive(ar);
-
+            int readSize = 0;
+            try
+            {
+                readSize = handler.EndReceive(ar);
+            } catch {
+                return;
+            }
             if (readSize < 1)
             {
                 return;
@@ -86,11 +100,44 @@ namespace CustomRemoteKey.Networking
             byte[] bb = new byte[readSize];
             Array.Copy(state.buffer, bb, readSize);
             string decodedText = Encoding.UTF8.GetString(bb);
-            if (decodedText == "ConTes<EOM>")
+            Console.WriteLine("Binary Data : {0}", BitConverter.ToString(bb));
+            if (AcceptingNewConnection && decodedText.IndexOf("NEWCON") == 0)
+            {
+                int ModelNameEndPos = 7;
+                for (int i = 7; i < bb.Length; i++)
+                {
+                    if (bb[i] == ',')
+                    {
+                        ModelNameEndPos = i;
+                        break;
+                    }
+                }
+                byte[] deviceNameB = new byte[ModelNameEndPos - 7];
+                byte[] hashVal = new byte[32];
+                Array.Copy(bb, 7, deviceNameB, 0, ModelNameEndPos - 7);
+                Array.Copy(bb, ModelNameEndPos + 1, hashVal, 0, hashVal.Length);
+
+                using (var sh256 = SHA256.Create())
+                {
+                    var hashed = sh256.ComputeHash(Encoding.ASCII.GetBytes(currentAccessKey));
+                    if (BitConverter.ToString(hashed) == BitConverter.ToString(hashVal))
+                    {
+                        Guid deviceId = Guid.NewGuid();
+                        DeviceAdded(new DeviceAddedEventArgs(Encoding.UTF8.GetString(deviceNameB), deviceId));
+                        string retData = "OK," + Environment.MachineName;
+                        
+                        bb = Encoding.UTF8.GetBytes("OK<EOM>");
+                    } else
+                    {
+                        bb = Encoding.UTF8.GetBytes("ERROR<EOM>");
+                    }
+                }
+            }
+            else if (decodedText == "ConTes<EOM>")
             {
                 bb = Encoding.UTF8.GetBytes("OK<EOM>");
             }else
-                bb = Encoding.UTF8.GetBytes("Test<EOM>");
+                bb = Encoding.UTF8.GetBytes("TEST<EOM>");
             handler.BeginSend(bb, 0, bb.Length, 0, new AsyncCallback(WriteCallback), state);
         }
 
@@ -107,6 +154,11 @@ namespace CustomRemoteKey.Networking
         {
             Closed = true;
             Socket.Close();
+        }
+
+        protected virtual void DeviceAdded(DeviceAddedEventArgs e)
+        {
+            OnDeviceAdded?.Invoke(this, e);
         }
 
         public class StateObject
