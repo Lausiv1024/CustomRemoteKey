@@ -1,4 +1,5 @@
 ﻿using CustomRemoteKey.Behaviours;
+using CustomRemoteKey.Native;
 using CustomRemoteKey.Networking;
 using System;
 using System.Collections.Generic;
@@ -36,11 +37,14 @@ namespace CustomRemoteKey
         int selectedButtonX = -1, selectedButtonY = -1;
 
         bool NotSelected => selectedButtonX == -1 && selectedButtonY == -1;
+        internal bool IsInHotKeySetting = false;
 
         //現在設定中のデバイス
         int currentDevice = -1;
 
-        List<DeviceProperty> devices = new List<DeviceProperty>();
+        public List<DeviceProperty> devices = new List<DeviceProperty>();
+
+        KeyboardHook hook;
 
         public MainWindow()
         {
@@ -94,14 +98,23 @@ namespace CustomRemoteKey
                         setUISelectionFromBehaviour(d.Behaviours[currentProfileMode, selectedButtonX + selectedButtonY * 4]);
                     };
                     Buttons.Children.Add(but);
+                    
                     ButtonDefault = but.Style;
                     count++;
+                    Activated += (s, e) =>
+                    {
+                        if (!hook.IsHooking) hook.Hook();
+                    };
+                    Deactivated +=(s, e) =>{
+                        if (hook.IsHooking) hook.Unhook();
+                    };
                 }
             }
             devices.Add(new DeviceProperty() { Id = Guid.NewGuid(), Name = "Sample"});
 
             SelectDevice.ContextMenu = new ContextMenu();
             SelectDevice.Click += (s, e) => SelectDevice.ContextMenu.IsOpen = true;
+            
             var item = new MenuItem();
             item.Header = "デバイスの追加";
             item.Click += (s, e) =>
@@ -132,6 +145,45 @@ namespace CustomRemoteKey
             };
 
             Instance = this;
+
+            hook = new KeyboardHook();
+            hook.KeyDownEvent += Hook_KeyDownEvent;
+            hook.KeyUpEvent += (s, e) =>
+            {
+                if (NotSelected) return;
+                var behaviour1 = devices[currentDevice].Behaviours[currentProfileMode, selectedButtonX + selectedButtonY * 4];
+                if (behaviour1 != null && behaviour1 is InputHotKey)
+                {
+                    var hotkey = behaviour1 as InputHotKey;
+                    hotkey.KeySettingComplete();
+                }
+
+                IsInHotKeySetting = false;
+            };
+            hook.Hook();
+        }
+
+        private void Hook_KeyDownEvent(object sender, KeyboardHook.KeyEventArg e)
+        {
+            Console.WriteLine("KeyCode : {0}", e.KeyCode);
+            e.TrashInput = IsInHotKeySetting;
+            if (IsInHotKeySetting && !NotSelected)
+            {
+                var behaviour = devices[currentDevice].Behaviours[currentProfileMode, selectedButtonX + selectedButtonY * 4];
+                if (behaviour != null && behaviour is InputHotKey)
+                {
+                    var hotkey = behaviour as InputHotKey;
+                    if (e.KeyCode == 160 || e.KeyCode == 161)
+                        hotkey.HasShift = true;
+                    else if (e.KeyCode == 162 || e.KeyCode == 163)
+                        hotkey.HasCtrl = true;
+                    else if (e.KeyCode == 164 || e.KeyCode == 165)
+                        hotkey.HasAlt = true;
+                    else if (e.KeyCode == 91 || e.KeyCode == 92)
+                        hotkey.HasWin = true;
+                    hotkey.setKeyCode(e.KeyCode);
+                }
+            }
         }
 
         private void AddNewDevice(DeviceProperty device)
@@ -167,6 +219,7 @@ namespace CustomRemoteKey
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
             e.Cancel = true;
+
             this.Hide();
 #if DEBUG
             Close_Click(null, null);
@@ -191,6 +244,7 @@ namespace CustomRemoteKey
         {
             MainServer.Close();
             Thread.Sleep(80);
+            hook.Unhook();
             Application.Current.Shutdown();
         }
 
@@ -212,12 +266,13 @@ namespace CustomRemoteKey
 
         private BehaviourBase GetBehaviour(int index)
         {
+            var behaviour = devices[currentDevice].Behaviours[currentProfileMode, selectedButtonX + selectedButtonY * 4];
             switch (index)
             {
-                case 1:
-                    return new InputHotKey();
+                case 1://InputHotKey
+                    return behaviour != null && (behaviour is InputHotKey) ? behaviour : new InputHotKey();
                 case 2:
-                    return new PlaySound();
+                    return behaviour != null && behaviour is PlaySound ? behaviour : new PlaySound();
             }
             return null;
         }
@@ -242,6 +297,23 @@ namespace CustomRemoteKey
         private void TaskbarIcon_TrayMouseDoubleClick(object sender, RoutedEventArgs e)
         {
             Show();
+        }
+
+        public void HandleButtonPressed()
+        {
+            var firstBehaviour = devices[currentDevice].Behaviours[currentProfileMode, 0];
+            if (firstBehaviour != null && firstBehaviour is InputHotKey)
+            {
+                firstBehaviour.OnButtonPressed();
+            }
+        }
+        public void HandleButtonReleased()
+        {
+            var firstBehaviour = devices[currentDevice].Behaviours[currentProfileMode, 0];
+            if (firstBehaviour != null && firstBehaviour is InputHotKey)
+            {
+                firstBehaviour.OnButtonReleased();
+            }
         }
     }
 }

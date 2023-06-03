@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml" Disappearing="ContentPage_Disappearing"
              x:Class="Phone.SettingPage" Loaded="ContentPage_Loaded_1"
              Title="Setting">
     <VerticalStackLayout Spacing="10" Margin="20">
         <Button Text="PCの追加" Clicked="Button_Clicked"/>
         <Label x:Name="DeviceName"/>
         <Label x:Name="UserName"/>
+        <Button x:Name="Host2IPBtn" Text="ホスト名からIP取得" Clicked="Host2IPBtn_Clicked"/>
+        <Button x:Name="IP2Host" Text="IPからホスト名取得" Clicked="IP2Host_Clicked"/>
     </VerticalStackLayout>
 </ContentPage>

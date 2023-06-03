@@ -26,17 +26,23 @@ namespace CustomRemoteKey
         [DllImport("user32.dll", EntryPoint = "MapVirtualKeyA")]
         public extern static int MapVirtualKey(int wCode, int wMapType);
 
-        public static void KeyDown(System.Windows.Forms.Keys key)
+        [DllImport("user32.dll")]
+        public extern static bool BlockInput(bool fBlockIt);
+
+        [DllImport("user32.dll")]
+        public extern static short GetKeyState(int nVirtKey);
+
+        public static void KeyDown(int key)
         {
             KeyOperation(key, true);
         }
 
-        public static void KeyUp(System.Windows.Forms.Keys key) => KeyOperation(key, false);
+        public static void KeyUp(int key) => KeyOperation(key, false);
 
-        public static void KeyOperation(System.Windows.Forms.Keys key, bool keyState)
+        public static void KeyOperation(int key, bool keyState)
         {
             INPUT[] inputs = new INPUT[1];
-            int vsc = MapVirtualKey((int)key, MAPVK_VK_TO_VSC);
+            int vsc = MapVirtualKey(key, MAPVK_VK_TO_VSC);
             inputs[0] = new INPUT();
             inputs[0].type = 1;
             inputs[0].ui.keyboard.wVk = (short)key;
@@ -47,11 +53,11 @@ namespace CustomRemoteKey
             SendInput(inputs.Length, inputs, Marshal.SizeOf(inputs[0]));
         }
 
-        public static void SendInputKeyPress(System.Windows.Forms.Keys key)
+        public static void SendInputKeyPress(int key)
         {
             INPUT[] inputs = new INPUT[2];
 
-            int vsc = MapVirtualKey((int)key, MAPVK_VK_TO_VSC);
+            int vsc = MapVirtualKey(key, MAPVK_VK_TO_VSC);
 
             inputs[0] = new INPUT();
             inputs[0].type = 1;

@@ -66,8 +66,9 @@
     <Compile Include="Behaviours\Registry.cs" />
     <Compile Include="DeviceProperty.cs" />
     <Compile Include="Event\Args\DeviceAddedEventArgs.cs" />
+    <Compile Include="Native\KeyboardHook.cs" />
     <Compile Include="Settings.cs" />
-    <Compile Include="WinAPI.cs" />
+    <Compile Include="Native\WinAPI.cs" />
     <Page Include="AddDevice.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>

@@ -10,6 +10,8 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using Windows.Devices.Usb;
 using CustomRemoteKey.Event.Args;
+using Windows.Networking;
+using Windows.Devices.WiFiDirect;
 
 namespace CustomRemoteKey.Networking
 {
@@ -27,6 +29,8 @@ namespace CustomRemoteKey.Networking
 
         public event EventHandler<DeviceAddedEventArgs> OnDeviceAdded;
 
+        WiFiDirectAdvertisementPublisher publisher;
+
         public bool AcceptingNewConnection = false;
         public string currentAccessKey { private get; set; }
 
@@ -36,6 +40,26 @@ namespace CustomRemoteKey.Networking
         public Server()
         {
             Endpoint = new IPEndPoint(IPAddress.Any, port);
+            Console.WriteLine(Dns.GetHostName());
+            //IPAddress[] adrList = Dns.GetHostAddresses(Dns.GetHostName());
+            //foreach (IPAddress address in adrList)
+            //{
+            //    Console.WriteLine(address.ToString());
+            //}
+
+            try
+            {
+                var hosts = Dns.GetHostEntry("MainLsv");
+                foreach(var host in hosts.AddressList) {
+                    Console.WriteLine(host.ToString());
+                }
+
+                publisher = new WiFiDirectAdvertisementPublisher();
+
+            } catch(SocketException ex)
+            {
+                Console.WriteLine("Can't find MainLsv");
+            }
         }
 
         internal void Init()
@@ -45,6 +69,7 @@ namespace CustomRemoteKey.Networking
             Main = new Thread(new ThreadStart(Round));
             Main.Start();
             Console.WriteLine("Socket Thread started.");
+            publisher.Start();
         }
 
         void Round()
@@ -136,7 +161,14 @@ namespace CustomRemoteKey.Networking
             else if (decodedText == "ConTes<EOM>")
             {
                 bb = Encoding.UTF8.GetBytes("OK<EOM>");
-            }else
+            }else if (decodedText == "1")
+            {
+                MainWindow.Instance.HandleButtonPressed();
+            }else if (decodedText == "0")
+            {
+                MainWindow.Instance.HandleButtonReleased();
+            }
+            else
                 bb = Encoding.UTF8.GetBytes("TEST<EOM>");
             handler.BeginSend(bb, 0, bb.Length, 0, new AsyncCallback(WriteCallback), state);
         }
@@ -154,6 +186,7 @@ namespace CustomRemoteKey.Networking
         {
             Closed = true;
             Socket.Close();
+            publisher.Stop();
         }
 
         protected virtual void DeviceAdded(DeviceAddedEventArgs e)
