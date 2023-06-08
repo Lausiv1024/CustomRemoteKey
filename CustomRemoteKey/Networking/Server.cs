@@ -28,9 +28,6 @@ namespace CustomRemoteKey.Networking
         private Thread Main;
 
         public event EventHandler<DeviceAddedEventArgs> OnDeviceAdded;
-
-        WiFiDirectAdvertisementPublisher publisher;
-
         public bool AcceptingNewConnection = false;
         public string currentAccessKey { private get; set; }
 
@@ -50,13 +47,11 @@ namespace CustomRemoteKey.Networking
             try
             {
                 var hosts = Dns.GetHostEntry("MainLsv");
-                foreach(var host in hosts.AddressList) {
+                foreach (var host in hosts.AddressList)
+                {
                     Console.WriteLine(host.ToString());
                 }
-
-                publisher = new WiFiDirectAdvertisementPublisher();
-
-            } catch(SocketException ex)
+            } catch (SocketException)
             {
                 Console.WriteLine("Can't find MainLsv");
             }
@@ -69,7 +64,6 @@ namespace CustomRemoteKey.Networking
             Main = new Thread(new ThreadStart(Round));
             Main.Start();
             Console.WriteLine("Socket Thread started.");
-            publisher.Start();
         }
 
         void Round()
@@ -89,7 +83,6 @@ namespace CustomRemoteKey.Networking
             {
                 Debug.WriteLine(ex.ToString());
             }
-            
         }
 
         void OnConnectRequest(IAsyncResult ar)
@@ -186,7 +179,6 @@ namespace CustomRemoteKey.Networking
         {
             Closed = true;
             Socket.Close();
-            publisher.Stop();
         }
 
         protected virtual void DeviceAdded(DeviceAddedEventArgs e)

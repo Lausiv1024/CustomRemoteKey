@@ -59,4 +59,8 @@
 	  </MauiXaml>
 	</ItemGroup>
 
+	<ItemGroup>
+	  <Folder Include="Networking\" />
+	</ItemGroup>
+
 </Project>

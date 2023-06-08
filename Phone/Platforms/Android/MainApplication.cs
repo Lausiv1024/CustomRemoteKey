@@ -2,6 +2,9 @@
 using Android.Runtime;
 
 [assembly: UsesPermission(Android.Manifest.Permission.Vibrate)]
+[assembly: UsesPermission(Android.Manifest.Permission.AccessFineLocation)]
+[assembly: UsesPermission(Android.Manifest.Permission.ChangeWifiState)]
+[assembly: UsesPermission(Android.Manifest.Permission.AccessWifiState)]
 namespace Phone
 {
     [Application]

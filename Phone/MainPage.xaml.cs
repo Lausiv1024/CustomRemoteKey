@@ -23,6 +23,8 @@ namespace Phone
 
         string host = "localhost";
         private const int PORT = 60001;
+
+        public static MainPage Instance { get; private set; }
         
 
         public MainPage()
@@ -106,6 +108,7 @@ namespace Phone
                 }
                 
             }, null, new TimeSpan(0), TimeSpan.FromMilliseconds(1000));
+            Instance = this;
         }
 
         private void OnConnected(object sender, EventArgs e)
