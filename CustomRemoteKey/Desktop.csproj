@@ -68,7 +68,8 @@
     <Compile Include="DeviceProperty.cs" />
     <Compile Include="Event\Args\DeviceAddedEventArgs.cs" />
     <Compile Include="Native\KeyboardHook.cs" />
-    <Compile Include="Networking\WiFiDirectSystem.cs" />
+    <Compile Include="Networking\Server2StSocket.cs" />
+    <Compile Include="Networking\WiFiDirectManager.cs" />
     <Compile Include="Settings.cs" />
     <Compile Include="Native\WinAPI.cs" />
     <Page Include="AddDevice.xaml">

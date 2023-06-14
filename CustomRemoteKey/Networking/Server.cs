@@ -12,6 +12,9 @@ using Windows.Devices.Usb;
 using CustomRemoteKey.Event.Args;
 using Windows.Networking;
 using Windows.Devices.WiFiDirect;
+using System.Runtime.InteropServices;
+using Windows.Storage.Streams;
+using Windows.Networking.Sockets;
 
 namespace CustomRemoteKey.Networking
 {
@@ -26,6 +29,10 @@ namespace CustomRemoteKey.Networking
         private Socket Socket;
 
         private Thread Main;
+
+        DataReader dataReader;
+        DataWriter dataWriter;
+        StreamSocket streamSocket;
 
         public event EventHandler<DeviceAddedEventArgs> OnDeviceAdded;
         public bool AcceptingNewConnection = false;
@@ -115,8 +122,35 @@ namespace CustomRemoteKey.Networking
                 return;
             }
 
+            HandleData(state.buffer, readSize);
+            
+        }
+
+        void WriteCallback(IAsyncResult ar)
+        {
+            StateObject state = (StateObject) ar.AsyncState;
+            Socket handler = state.workingSocket;
+            handler.EndSend(ar);
+            handler.BeginReceive(state.buffer, 0, StateObject.BUFFER_SIZE, 
+                0, new AsyncCallback(ReadCallback), state);
+        }
+
+        public void Close()
+        {
+            Closed = true;
+            Socket.Close();
+        }
+
+        protected virtual void DeviceAdded(DeviceAddedEventArgs e)
+        {
+            OnDeviceAdded?.Invoke(this, e);
+        }
+
+        internal void HandleData(byte[] buffer, int readSize)
+        {
             byte[] bb = new byte[readSize];
-            Array.Copy(state.buffer, bb, readSize);
+            Array.Copy(buffer, bb, readSize);
+
             string decodedText = Encoding.UTF8.GetString(bb);
             Console.WriteLine("Binary Data : {0}", BitConverter.ToString(bb));
             if (AcceptingNewConnection && decodedText.IndexOf("NEWCON") == 0)
@@ -143,47 +177,25 @@ namespace CustomRemoteKey.Networking
                         Guid deviceId = Guid.NewGuid();
                         DeviceAdded(new DeviceAddedEventArgs(Encoding.UTF8.GetString(deviceNameB), deviceId));
                         string retData = "OK," + Environment.MachineName;
-                        
+
                         bb = Encoding.UTF8.GetBytes("OK<EOM>");
                     } else
                     {
                         bb = Encoding.UTF8.GetBytes("ERROR<EOM>");
                     }
                 }
-            }
-            else if (decodedText == "ConTes<EOM>")
+            } else if (decodedText == "ConTes<EOM>")
             {
                 bb = Encoding.UTF8.GetBytes("OK<EOM>");
-            }else if (decodedText == "1")
+            } else if (decodedText == "1")
             {
                 MainWindow.Instance.HandleButtonPressed();
-            }else if (decodedText == "0")
+            } else if (decodedText == "0")
             {
                 MainWindow.Instance.HandleButtonReleased();
-            }
-            else
+            } else
                 bb = Encoding.UTF8.GetBytes("TEST<EOM>");
-            handler.BeginSend(bb, 0, bb.Length, 0, new AsyncCallback(WriteCallback), state);
-        }
-
-        void WriteCallback(IAsyncResult ar)
-        {
-            StateObject state = (StateObject) ar.AsyncState;
-            Socket handler = state.workingSocket;
-            handler.EndSend(ar);
-            handler.BeginReceive(state.buffer, 0, StateObject.BUFFER_SIZE, 
-                0, new AsyncCallback(ReadCallback), state);
-        }
-
-        public void Close()
-        {
-            Closed = true;
-            Socket.Close();
-        }
-
-        protected virtual void DeviceAdded(DeviceAddedEventArgs e)
-        {
-            OnDeviceAdded?.Invoke(this, e);
+            //handler.BeginSend(bb, 0, bb.Length, 0, new AsyncCallback(WriteCallback), state);
         }
 
         public class StateObject

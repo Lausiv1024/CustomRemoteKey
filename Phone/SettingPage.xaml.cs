@@ -41,6 +41,7 @@ public partial class SettingPage : ContentPage
         {
             await DisplayAlert("えらー", $"ホストのIPが見つかりませんでした\n例外メッセージ：{ex.Message}", "OK");
         }
+        
     }
 
     private async void IP2Host_Clicked(object sender, EventArgs e)
@@ -72,17 +73,4 @@ public partial class SettingPage : ContentPage
         }
     }
 
-    private void IPStatistics_Clicked(object sender, EventArgs e)
-    {
-        IPGlobalProperties properties = IPGlobalProperties.GetIPGlobalProperties();
-        IPGlobalStatistics ipstat = properties.GetIPv4GlobalStatistics();
-        Console.WriteLine("      Received ............................ : {0}",
-     ipstat.ReceivedPackets);
-        Console.WriteLine("      Forwarded ........................... : {0}",
-        ipstat.ReceivedPacketsForwarded);
-        Console.WriteLine("      Delivered ........................... : {0}",
-        ipstat.ReceivedPacketsDelivered);
-        Console.WriteLine("      Discarded ........................... : {0}",
-        ipstat.ReceivedPacketsDiscarded);
-    }
 }

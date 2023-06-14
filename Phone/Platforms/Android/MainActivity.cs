@@ -1,11 +1,67 @@
 ﻿using Android.App;
+using Android.Content;
 using Android.Content.PM;
 using Android.OS;
+using Android.Widget;
+using Android.Net.Wifi.P2p;
+using Android.Provider;
+using Android.Util;
+using Android.SE.Omapi;
+using Android.Views;
 
 namespace Phone
 {
+    [IntentFilter(new[] {Platform.Intent.ActionAppAction},
+        Categories = new[] {Android.Content.Intent.CategoryDefault})]
     [Activity(Theme = "@style/Maui.SplashTheme", MainLauncher = true, ConfigurationChanges = ConfigChanges.ScreenSize | ConfigChanges.Orientation | ConfigChanges.UiMode | ConfigChanges.ScreenLayout | ConfigChanges.SmallestScreenSize | ConfigChanges.Density)]
     public class MainActivity : MauiAppCompatActivity
     {
+        private BroadcastReceiver mReceiver;
+        internal WifiP2pManager P2PManager;
+        internal WifiP2pManager.Channel channel;
+        IntentFilter filter = new IntentFilter();
+        public override void OnPostCreate(Bundle savedInstanceState, PersistableBundle persistentState)
+        {
+            base.OnPostCreate(savedInstanceState, persistentState);
+
+            filter.AddAction(WifiP2pManager.WifiP2pStateChangedAction);
+            filter.AddAction(WifiP2pManager.WifiP2pPeersChangedAction);
+            filter.AddAction(WifiP2pManager.WifiP2pConnectionChangedAction);
+            filter.AddAction(WifiP2pManager.WifiP2pThisDeviceChangedAction);
+
+            mReceiver = new MyReceiver();
+            
+            P2PManager = (WifiP2pManager)GetSystemService(WifiP2pService);
+            channel = P2PManager.Initialize(this, MainLooper, null);
+        }
+
+        protected override void OnResume()
+        {
+            base.OnResume();
+            RegisterReceiver(mReceiver, filter);
+        }
+
+        protected override void OnDestroy()
+        {
+            base.OnDestroy();
+            UnregisterReceiver(mReceiver);
+        }
+
+        internal void ResetData()
+        {
+            
+            //var fragmentList = FragmentManager.FindFragmentById<Fragment>(Resource.Id.)
+        }
+
+
+
+        public class MyReceiver : BroadcastReceiver
+        {
+            public override void OnReceive(Context context, Intent intent)
+            {
+                Toast.MakeText(context, "Receive broadcast: " + intent.Action,
+                    ToastLength.Long).Show();
+            }
+        }
     }
 }

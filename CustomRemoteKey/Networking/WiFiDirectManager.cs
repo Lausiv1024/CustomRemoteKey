@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Windows.Devices.WiFiDirect.Services;
+using Windows.Devices.WiFiDirect;
 
 namespace CustomRemoteKey.Networking
 {
@@ -14,10 +15,14 @@ namespace CustomRemoteKey.Networking
             {
                 return instance == null ? new WiFiDirectManager() : instance;
             } }
+        
         private WiFiDirectManager() 
         {
             instance = this;
         }
 
+        WiFiDirectAdvertisementPublisher AdvertisementPublisher { get; set; }
+
+        //public ObservableCollection<>
     }
 }

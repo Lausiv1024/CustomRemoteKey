@@ -109,6 +109,8 @@ namespace Phone
                 
             }, null, new TimeSpan(0), TimeSpan.FromMilliseconds(1000));
             Instance = this;
+
+            
         }
 
         private void OnConnected(object sender, EventArgs e)
