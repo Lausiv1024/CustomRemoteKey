@@ -4,10 +4,11 @@
              x:Class="Phone.SettingPage" Loaded="ContentPage_Loaded_1"
              Title="Setting">
     <VerticalStackLayout Spacing="10" Margin="20">
-        <Button Text="PCの追加" Clicked="Button_Clicked"/>
+        <Button Text="PCの追加(LAN内)" Clicked="Button_Clicked"/>
         <Label x:Name="DeviceName"/>
         <Label x:Name="UserName"/>
         <Button x:Name="Host2IPBtn" Text="ホスト名からIP取得" Clicked="Host2IPBtn_Clicked"/>
         <Button x:Name="IP2Host" Text="IPからホスト名取得" Clicked="IP2Host_Clicked"/>
+        <Button Text="QRコードから追加(Wi-Fi Direct)"/>
     </VerticalStackLayout>
 </ContentPage>

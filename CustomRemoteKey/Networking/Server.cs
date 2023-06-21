@@ -15,6 +15,8 @@ using Windows.Devices.WiFiDirect;
 using System.Runtime.InteropServices;
 using Windows.Storage.Streams;
 using Windows.Networking.Sockets;
+using System.IO;
+using Windows.ApplicationModel.VoiceCommands;
 
 namespace CustomRemoteKey.Networking
 {
@@ -30,14 +32,18 @@ namespace CustomRemoteKey.Networking
 
         private Thread Main;
 
-        DataReader dataReader;
-        DataWriter dataWriter;
-        StreamSocket streamSocket;
+        //DataReader dataReader;
+        //DataWriter dataWriter;
+        //StreamSocket streamSocket;
 
         public event EventHandler<DeviceAddedEventArgs> OnDeviceAdded;
         public bool AcceptingNewConnection = false;
         public string currentAccessKey { private get; set; }
 
+        private SymmetricAlgorithm symAl;
+        private static Random random = new Random();
+        internal const int SymAlBlockSize = 16;
+        private TcpListener listener;
 
         public bool Closed { get; private set; }
 
@@ -45,23 +51,6 @@ namespace CustomRemoteKey.Networking
         {
             Endpoint = new IPEndPoint(IPAddress.Any, port);
             Console.WriteLine(Dns.GetHostName());
-            //IPAddress[] adrList = Dns.GetHostAddresses(Dns.GetHostName());
-            //foreach (IPAddress address in adrList)
-            //{
-            //    Console.WriteLine(address.ToString());
-            //}
-
-            try
-            {
-                var hosts = Dns.GetHostEntry("MainLsv");
-                foreach (var host in hosts.AddressList)
-                {
-                    Console.WriteLine(host.ToString());
-                }
-            } catch (SocketException)
-            {
-                Console.WriteLine("Can't find MainLsv");
-            }
         }
 
         internal void Init()
@@ -71,6 +60,75 @@ namespace CustomRemoteKey.Networking
             Main = new Thread(new ThreadStart(Round));
             Main.Start();
             Console.WriteLine("Socket Thread started.");
+            
+            //try
+            //{
+            //    symAl = new AesCryptoServiceProvider();
+            //    symAl.KeySize = 256;
+            //    symAl.BlockSize = SymAlBlockSize * 8;
+            //    symAl.Padding = PaddingMode.Zeros;
+            //    symAl.Mode = CipherMode.CBC;
+            //    symAl.GenerateIV();
+            //} catch
+            //{
+            //    Console.WriteLine("Failed to Init Encryption");
+            //}
+        }
+
+        private Stream GetNetworkStream()
+        {
+            return new NetworkStream(Socket);
+        }
+
+        private void Round2()
+        {
+            
+            try
+            {
+                listener = new TcpListener(IPAddress.Parse("127.0.0.1"), 13500);
+                listener.Start();
+                byte[] buffer = new byte[256];
+                string data = null;
+                while (!Closed)
+                {
+                    Console.Write("Waiting for a connection... ");
+
+                    // Perform a blocking call to accept requests.
+                    // You could also use server.AcceptSocket() here.
+                    TcpClient client = listener.AcceptTcpClient();
+                    Console.WriteLine("Connected!");
+
+                    data = null;
+
+                    // Get a stream object for reading and writing
+                    NetworkStream stream = client.GetStream();
+
+                    int i;
+
+                    // Loop to receive all the data sent by the client.
+                    while ((i = stream.Read(buffer, 0, buffer.Length)) != 0)
+                    {
+                        // Translate data bytes to a ASCII string.
+                        data = System.Text.Encoding.ASCII.GetString(buffer, 0, i);
+                        Console.WriteLine("Received: {0}", data);
+
+                        // Process the data sent by the client.
+                        data = data.ToUpper();
+
+                        byte[] msg = System.Text.Encoding.ASCII.GetBytes(data);
+
+                        // Send back a response.
+                        stream.Write(msg, 0, msg.Length);
+                        Console.WriteLine("Sent: {0}", data);
+                    }
+                }
+            } catch(SocketException e)
+            {
+                Console.WriteLine("SocketException: {0}", e);
+            } finally
+            {
+                listener.Stop();
+            }
         }
 
         void Round()
@@ -85,6 +143,7 @@ namespace CustomRemoteKey.Networking
                     Thread.Sleep(10);
                     Socket.BeginAccept(new AsyncCallback(OnConnectRequest), Socket);
                     SocketEvent.WaitOne();
+
                 }
             } catch(Exception ex)
             {

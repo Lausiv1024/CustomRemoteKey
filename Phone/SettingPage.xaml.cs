@@ -15,8 +15,11 @@ public partial class SettingPage : ContentPage
 
     private async void Button_Clicked(object sender, EventArgs e)
     {
-		string code = await DisplayPromptAsync("PCの追加", "6桁のコードを入力してください。", maxLength : 6, keyboard : Keyboard.Numeric);
-        
+        //string code = await DisplayPromptAsync("PCの追加", "6桁のコードを入力してください。", maxLength : 6, keyboard : Keyboard.Numeric)
+        string a = string.Empty;
+
+        if (a != string.Empty)
+            await DisplayAlert("Scanned", a, "OK");
     }
 
     private void ContentPage_Loaded_1(object sender, EventArgs e)

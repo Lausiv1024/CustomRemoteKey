@@ -8,6 +8,7 @@ using Android.Provider;
 using Android.Util;
 using Android.SE.Omapi;
 using Android.Views;
+using Android.Runtime;
 
 namespace Phone
 {
@@ -19,7 +20,9 @@ namespace Phone
         private BroadcastReceiver mReceiver;
         internal WifiP2pManager P2PManager;
         internal WifiP2pManager.Channel channel;
+        public static MainActivity Instance;
         IntentFilter filter = new IntentFilter();
+
         public override void OnPostCreate(Bundle savedInstanceState, PersistableBundle persistentState)
         {
             base.OnPostCreate(savedInstanceState, persistentState);
@@ -33,6 +36,7 @@ namespace Phone
             
             P2PManager = (WifiP2pManager)GetSystemService(WifiP2pService);
             channel = P2PManager.Initialize(this, MainLooper, null);
+            Instance = this;
         }
 
         protected override void OnResume()
@@ -47,14 +51,6 @@ namespace Phone
             UnregisterReceiver(mReceiver);
         }
 
-        internal void ResetData()
-        {
-            
-            //var fragmentList = FragmentManager.FindFragmentById<Fragment>(Resource.Id.)
-        }
-
-
-
         public class MyReceiver : BroadcastReceiver
         {
             public override void OnReceive(Context context, Intent intent)
@@ -63,5 +59,47 @@ namespace Phone
                     ToastLength.Long).Show();
             }
         }
+
+        private class MyActionListener : Java.Lang.Object, WifiP2pManager.IActionListener
+        {
+            private readonly Context _context;
+            private readonly string _failure;
+            private readonly Action _action;
+
+            public MyActionListener(Context context, string failure, Action action)
+            {
+                _context = context;
+                _failure = failure;
+                _action = action;
+            }
+
+            public void OnFailure([GeneratedEnum] WifiP2pFailureReason reason)
+            {
+                
+            }
+
+            public void OnSuccess()
+            {
+                
+            }
+        }
+
+        public void Connect(WifiP2pConfig config)
+        {
+            P2PManager.Connect(channel, config, new MyActionListener(this, "", () => { }));
+        }
+
+        public void Disconnect()
+        {
+            //var fragment = FragmentManager.FindFragmentById<DeviceDetailFragment>(Resource.Id.frag_detail);
+        }
+
+        //public async Task<string> ScanQRCode()
+        //{
+        //    MobileBarcodeScanner.Initialize(Application);
+        //    var scanner = new MobileBarcodeScanner();
+        //    var result = await scanner.Scan();
+        //    return result.Text;
+        //}
     }
 }

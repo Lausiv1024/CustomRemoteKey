@@ -1,4 +1,5 @@
 ﻿using CustomRemoteKey.Event.Args;
+using QRCoder;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,6 +13,8 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 
 namespace CustomRemoteKey
 {
@@ -31,8 +34,23 @@ namespace CustomRemoteKey
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            ConnectionCode.Text = code.ToString();
+            //ConnectionCode.Text = code.ToString();
             MainWindow.Instance.MainServer.currentAccessKey = code.ToString();
+            var qrGen = new QRCodeGenerator();
+            var ipList = Util.GetIpAddr();
+            if (ipList.Length != 0)
+            {
+                string ipStr = "";
+                foreach (var ip in ipList)
+                {
+                    ipStr += ip + ",";
+                }
+                ipStr += "AccessKey=" + BitConverter.ToString(Util.Hash(Encoding.UTF8.GetBytes(code.ToString())));
+                var data = qrGen.CreateQrCode(ipStr, QRCodeGenerator.ECCLevel.Q);
+
+                var a = new BitmapByteQRCode(data);
+                QRImg.Source = Util.ToBitmapImage(a.GetGraphic(20));
+            }
         }
 
         private void Window_KeyDown(object sender, KeyEventArgs e)

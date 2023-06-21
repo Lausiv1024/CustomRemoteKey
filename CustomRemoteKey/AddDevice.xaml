@@ -9,7 +9,7 @@
         ui:WindowHelper.UseModernWindowStyle="True" KeyDown="Window_KeyDown"
         Title="AddDevice" Height="450" Width="400">
     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-        <TextBlock Text="以下のコードを入力してデバイスを追加" Margin="20"/>
-        <TextBlock x:Name="ConnectionCode" Text="30wfda4yg" FontSize="36" HorizontalAlignment="Center"/>
+        <TextBlock Text="以下のQRを読み込んでデバイスを追加" Margin="20"/>
+        <Image x:Name="QRImg" Margin="40"/>
     </StackPanel>
 </Window>

@@ -99,7 +99,7 @@ namespace CustomRemoteKey
                     };
                     Buttons.Children.Add(but);
                     
-                    ButtonDefault = but.Style;
+                    
                     count++;
                     Activated += (s, e) =>
                     {
@@ -109,6 +109,7 @@ namespace CustomRemoteKey
                         if (hook.IsHooking) hook.Unhook();
                     };
                 }
+                ButtonDefault = ((Button) Buttons.Children[0]).Style;
             }
             devices.Add(new DeviceProperty() { Id = Guid.NewGuid(), Name = "Sample"});
 

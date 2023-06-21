@@ -64,6 +64,7 @@
     <Compile Include="Behaviours\InputHotKey.cs" />
     <Compile Include="Behaviours\PlaySound.cs" />
     <Compile Include="Behaviours\Registry.cs" />
+    <Compile Include="ConnectionSetting.cs" />
     <Compile Include="CRKDConstances.cs" />
     <Compile Include="DeviceProperty.cs" />
     <Compile Include="Event\Args\DeviceAddedEventArgs.cs" />
@@ -72,6 +73,7 @@
     <Compile Include="Networking\WiFiDirectManager.cs" />
     <Compile Include="Settings.cs" />
     <Compile Include="Native\WinAPI.cs" />
+    <Compile Include="Util.cs" />
     <Page Include="AddDevice.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -128,6 +130,9 @@
     </PackageReference>
     <PackageReference Include="Newtonsoft.Json">
       <Version>13.0.3</Version>
+    </PackageReference>
+    <PackageReference Include="QRCoder">
+      <Version>1.4.3</Version>
     </PackageReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
