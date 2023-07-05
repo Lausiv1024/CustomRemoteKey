@@ -3,6 +3,8 @@ using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text;
 using System;
+using System.Net;
+using Microsoft.Maui.Controls.Xaml;
 
 namespace Phone
 {
@@ -21,7 +23,7 @@ namespace Phone
 
         int tickCount;
 
-        string host = "localhost";
+        string host = "192.168.40.95";
         private const int PORT = 60001;
 
         public static MainPage Instance { get; private set; }
@@ -118,6 +120,38 @@ namespace Phone
 
         }
 
+        public async Task<bool> ConnectTo(string[] ipAddr, byte[] encryptedCommonKey)
+        {
+            foreach (string ip in ipAddr)
+            {
+                //指定されたIPで接続失敗したら次のＩＰで接続を試行する。
+                try
+                {
+                    await Client.ConnectAsync(IpFromString(ip), PORT);
+                    IsConnected = true;
+                    break;
+                } catch(SocketException ex) 
+                {
+                    Console.WriteLine(ex);
+                }
+            }
+
+            if (!IsConnected) return false;
+            
+            
+            
+            return true;
+        }
+
+        IPAddress IpFromString(string ip)
+        {
+            if ( IPAddress.TryParse(ip, out IPAddress ipAddress))
+            {
+                return ipAddress;
+            }
+            return null;
+        }
+
         private void OnDisconnected(object sender, EventArgs e)
         {
 
@@ -168,6 +202,7 @@ namespace Phone
             if (Client.Connected)
                 Client.Close();
 #endif
+            Debug.WriteLine("Disappering");
         }
 
         private void ContentPage_Appearing(object sender, EventArgs e)
@@ -178,6 +213,13 @@ namespace Phone
         private async void ToolbarItem_Clicked(object sender, EventArgs e)
         {
             await Navigation.PushAsync(new SettingPage());
+        }
+
+        public enum OPCodes
+        {
+            AUTHPRI = 0,
+            AUTHPUB = 1,
+            KEYINPUT = 2,
         }
     }
 }

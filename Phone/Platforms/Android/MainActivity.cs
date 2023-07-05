@@ -22,6 +22,8 @@ namespace Phone
         internal WifiP2pManager.Channel channel;
         public static MainActivity Instance;
         IntentFilter filter = new IntentFilter();
+        Client client = new Client();
+        internal Client MainClient { get { return client; } }
 
         public override void OnPostCreate(Bundle savedInstanceState, PersistableBundle persistentState)
         {

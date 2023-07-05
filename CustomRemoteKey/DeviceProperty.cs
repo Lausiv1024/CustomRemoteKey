@@ -16,6 +16,10 @@ namespace CustomRemoteKey
 
         public string[,] ButtonName;
 
+        public string PubKeyXML;
+
+        public string PrivateKeyXML;
+
         public DeviceProperty()
         {
             Behaviours = new BehaviourBase[6, 20];

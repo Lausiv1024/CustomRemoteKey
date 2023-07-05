@@ -75,6 +75,11 @@ namespace CustomRemoteKey.Networking
             //}
         }
 
+        internal void PrepareNewConnection()
+        {
+
+        }
+
         private Stream GetNetworkStream()
         {
             return new NetworkStream(Socket);
@@ -115,7 +120,7 @@ namespace CustomRemoteKey.Networking
                         // Process the data sent by the client.
                         data = data.ToUpper();
 
-                        byte[] msg = System.Text.Encoding.ASCII.GetBytes(data);
+                        byte[] msg = Encoding.ASCII.GetBytes(data);
 
                         // Send back a response.
                         stream.Write(msg, 0, msg.Length);

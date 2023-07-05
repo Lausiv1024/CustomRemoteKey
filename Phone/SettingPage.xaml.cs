@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using CommunityToolkit.Maui.Alerts;
 
 namespace Phone;
 
@@ -16,10 +17,26 @@ public partial class SettingPage : ContentPage
     private async void Button_Clicked(object sender, EventArgs e)
     {
         //string code = await DisplayPromptAsync("PCの追加", "6桁のコードを入力してください。", maxLength : 6, keyboard : Keyboard.Numeric)
-        string a = string.Empty;
+        PermissionStatus isCameraAllowed = await Permissions.CheckStatusAsync<Permissions.Camera>();
+        if (isCameraAllowed != PermissionStatus.Granted)
+        {
+            if (isCameraAllowed == PermissionStatus.Disabled || isCameraAllowed == PermissionStatus.Unknown)
+            {
+                var a = Toast.Make("カメラはこのデバイスでサポートされていません．");
+                await a.Show();
+                return;
+            }
+            await DisplayAlert("PCの追加", "QRの読み取りでカメラを使用します．\nこの後のダイアログでカメラの使用を許可してください．", "OK");
+            PermissionStatus status = await Permissions.RequestAsync<Permissions.Camera>();
 
-        if (a != string.Empty)
-            await DisplayAlert("Scanned", a, "OK");
+            if (status != PermissionStatus.Granted)
+            {
+                var a = Toast.Make("カメラを使用するには許可が必要です．");
+                await a.Show();
+                return;
+            }
+        }
+        await Navigation.PushAsync(new QRReading());
     }
 
     private void ContentPage_Loaded_1(object sender, EventArgs e)

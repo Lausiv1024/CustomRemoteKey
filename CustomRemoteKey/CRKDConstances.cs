@@ -13,5 +13,8 @@ namespace CustomRemoteKey
         internal readonly Guid ConnectionHelperIPAddr_Write = new Guid("7691ee00-acaa-461e-aadf-1f75681c4876");
 
         internal readonly Guid ConnectionHelperSecurityKey_Read = new Guid("113498a3-f4a1-448d-bee6-b2b017ed6932");
+
+        internal const int AES_BLOCK_SIZE = 128;
+        internal const int AES_KEY_SIZE = 256;
     }
 }

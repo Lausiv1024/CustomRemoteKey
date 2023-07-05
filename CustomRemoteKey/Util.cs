@@ -71,5 +71,13 @@ namespace CustomRemoteKey
             }
             return hashData;
         }
+
+        public static void CreateRSAKeys(out string publicKey, out string privatekey)
+        {
+            RSACryptoServiceProvider rsa = new RSACryptoServiceProvider();
+            publicKey = rsa.ToXmlString(false);
+            privatekey = rsa.ToXmlString(true);
+            
+        }
     }
 }

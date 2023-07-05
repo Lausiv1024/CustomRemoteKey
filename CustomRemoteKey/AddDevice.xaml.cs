@@ -24,12 +24,15 @@ namespace CustomRemoteKey
     public partial class AddDevice : Window
     {
         public int code = 0;
+        private DeviceProperty property;
         public AddDevice()
         {
             InitializeComponent();
             //code = new Random().Next(100000, 999999);
             code = 114514;
             MainWindow.Instance.MainServer.OnDeviceAdded += DeviceAdded;
+            property = new DeviceProperty();
+
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -38,6 +41,10 @@ namespace CustomRemoteKey
             MainWindow.Instance.MainServer.currentAccessKey = code.ToString();
             var qrGen = new QRCodeGenerator();
             var ipList = Util.GetIpAddr();
+
+
+            Util.CreateRSAKeys(out string pk, out string b);
+            Console.WriteLine("PubKey : {0}\n PriKey : {1}", pk, b);
             if (ipList.Length != 0)
             {
                 string ipStr = "";
@@ -45,9 +52,8 @@ namespace CustomRemoteKey
                 {
                     ipStr += ip + ",";
                 }
-                ipStr += "AccessKey=" + BitConverter.ToString(Util.Hash(Encoding.UTF8.GetBytes(code.ToString())));
+                ipStr += "AccessKey=" + pk;
                 var data = qrGen.CreateQrCode(ipStr, QRCodeGenerator.ECCLevel.Q);
-
                 var a = new BitmapByteQRCode(data);
                 QRImg.Source = Util.ToBitmapImage(a.GetGraphic(20));
             }
@@ -66,6 +72,7 @@ namespace CustomRemoteKey
 
         private void DeviceAdded(object sender, DeviceAddedEventArgs e)
         {
+
             Dispatcher.Invoke(() => this.Close());
         }
     }

@@ -1,4 +1,7 @@
-﻿namespace Phone
+﻿using Camera.MAUI;
+using CommunityToolkit.Maui;
+
+namespace Phone
 {
     public static class MauiProgram
     {
@@ -7,6 +10,8 @@
             var builder = MauiApp.CreateBuilder();
             builder
                 .UseMauiApp<App>()
+                .UseMauiCameraView()
+                .UseMauiCommunityToolkit()
                 .ConfigureFonts(fonts =>
                 {
                     fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
