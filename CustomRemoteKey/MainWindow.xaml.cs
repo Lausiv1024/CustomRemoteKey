@@ -44,7 +44,7 @@ namespace CustomRemoteKey
 
         public List<DeviceProperty> devices = new List<DeviceProperty>();
 
-        KeyboardHook hook;
+        readonly KeyboardHook hook;
 
         public MainWindow()
         {
@@ -98,7 +98,6 @@ namespace CustomRemoteKey
                         setUISelectionFromBehaviour(d.Behaviours[currentProfileMode, selectedButtonX + selectedButtonY * 4]);
                     };
                     Buttons.Children.Add(but);
-                    
                     
                     count++;
                     Activated += (s, e) =>

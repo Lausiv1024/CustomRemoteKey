@@ -39,7 +39,6 @@ namespace Phone
             {
                 client.Connect(Address, PORT);
                 connected = true;
-
             } catch (SocketException)
             {
                 connected = false;    

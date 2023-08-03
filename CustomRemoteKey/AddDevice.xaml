@@ -7,9 +7,9 @@
         mc:Ignorable="d" ResizeMode="NoResize" Loaded="Window_Loaded"
         xmlns:ui="http://schemas.modernwpf.com/2019" Closing="Window_Closing"
         ui:WindowHelper.UseModernWindowStyle="True" KeyDown="Window_KeyDown"
-        Title="AddDevice" Height="450" Width="400">
+        Title="AddDevice" Height="500" Width="450">
     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-        <TextBlock Text="以下のQRを読み込んでデバイスを追加" Margin="20"/>
-        <Image x:Name="QRImg" Margin="40"/>
+        <TextBlock Text="以下のQRを読み込んでデバイスを追加" Margin="20, 2"/>
+        <Image x:Name="QRImg" Margin="20" MouseDown="QRImg_MouseDown"/>
     </StackPanel>
 </Window>

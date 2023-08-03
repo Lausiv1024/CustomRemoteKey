@@ -70,46 +70,48 @@ namespace Phone
             Grid.SetRow(label, ButtonCountY);
             Grid.SetColumnSpan(label, ButtonCountX);
             ControlButtonDeck.Children.Add(label);
+            Client = new TcpClient();
+            Client.SendTimeout = 2000;
+            Client.ReceiveTimeout = 2000;
+            //new Timer((state) =>
+            //{
+            //    if (IsConnected)
+            //    {
+            //        Dispatcher.Dispatch(() => Title = "Controls - Connected");
+            //        tickCount++;
+            //        try
+            //        {
+            //            if (tickCount  % 10 == 0)
+            //            {
+            //                if (!Client.Connected)
+            //                {
+            //                    IsConnected = false;
+            //                    return;
+            //                }
+            //                Client.Client.Send(Encoding.UTF8.GetBytes("ConTes<EOM>"));
+            //            }
+            //        } catch
+            //        {
 
-            new Timer((state) =>
-            {
-                if (IsConnected)
-                {
-                    Dispatcher.Dispatch(() => Title = "Controls - Connected");
-                    tickCount++;
-                    try
-                    {
-                        if (tickCount  % 10 == 0)
-                        {
-                            if (!Client.Connected)
-                            {
-                                IsConnected = false;
-                                return;
-                            }
-                            Client.Client.Send(Encoding.UTF8.GetBytes("ConTes<EOM>"));
-                        }
-                    } catch
-                    {
-
-                    }
-                    return;
-                }
-                try
-                {
-                    Client.Connect(host, PORT);
-                    IsConnected = true;
-                } catch(Exception ex)
-                {
-                    if (ex.GetType() == typeof(SocketException))
-                    {
-                        Dispatcher.Dispatch(() =>
-                        {
-                            Title = "Controls - Not Connected";
-                        });
-                    }
-                }
+            //        }
+            //        return;
+            //    }
+            //    try
+            //    {
+            //        Client.Connect(host, PORT);
+            //        IsConnected = true;
+            //    } catch(Exception ex)
+            //    {
+            //        if (ex.GetType() == typeof(SocketException))
+            //        {
+            //            Dispatcher.Dispatch(() =>
+            //            {
+            //                Title = "Controls - Not Connected";
+            //            });
+            //        }
+            //    }
                 
-            }, null, new TimeSpan(0), TimeSpan.FromMilliseconds(1000));
+            //}, null, new TimeSpan(0), TimeSpan.FromMilliseconds(1000));
             Instance = this;
 
             
@@ -122,24 +124,55 @@ namespace Phone
 
         public async Task<bool> ConnectTo(string[] ipAddr, byte[] encryptedCommonKey)
         {
+            if (ipAddr == null) return false;
+            if (ipAddr.Length == 0) return false;
+            Thread[] threads = new Thread[ipAddr.Length];
+            int i = 0;
             foreach (string ip in ipAddr)
             {
+                //threads[i] = new Thread(new ThreadStart(async() =>
+                //{
+
+                //}));
                 //指定されたIPで接続失敗したら次のＩＰで接続を試行する。
                 try
                 {
                     await Client.ConnectAsync(IpFromString(ip), PORT);
                     IsConnected = true;
-                    break;
-                } catch(SocketException ex) 
+                    //foreach (var thread in threads)
+                    //{
+                    //    if (Thread.CurrentThread.ManagedThreadId != thread.ManagedThreadId)
+                    //    {
+                    //        thread.Abort();
+                    //    }
+                    //}
+                } catch (SocketException ex)
                 {
                     Console.WriteLine(ex);
                 }
+                i++;
             }
 
             if (!IsConnected) return false;
-            
-            
-            
+
+            var newConnection = Encoding.UTF8.GetBytes("NEWCON");
+            var sendData = new byte[newConnection.Length + encryptedCommonKey.Length];
+            Array.Copy(newConnection, sendData, newConnection.Length);
+            Array.Copy(encryptedCommonKey, 0, sendData, newConnection.Length, encryptedCommonKey.Length);
+            Client.Client.Send(sendData);
+            byte[] buffer = new byte[1024];
+            var received = await Client.Client.ReceiveAsync(buffer, SocketFlags.None);
+            if (Encoding.ASCII.GetString(buffer, 0, received) == "OK<EOM>")
+            {
+                IsConnected = true;
+                MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    Navigation.PopToRootAsync();
+                });
+            } else
+            {
+                DispAlertFromOtherThread("ERROR", "クライアントに正常に接続できませんでした。\nもう一度やり直してください。", "OK");
+            }
             return true;
         }
 
@@ -150,6 +183,14 @@ namespace Phone
                 return ipAddress;
             }
             return null;
+        }
+
+        private static void DispAlertFromOtherThread(string title, string message, string cancel)
+        {
+            MainThread.BeginInvokeOnMainThread(async() =>
+            {
+                await Instance.DisplayAlert(title, message, cancel);
+            });
         }
 
         private void OnDisconnected(object sender, EventArgs e)

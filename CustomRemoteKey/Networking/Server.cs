@@ -44,8 +44,18 @@ namespace CustomRemoteKey.Networking
         private static Random random = new Random();
         internal const int SymAlBlockSize = 16;
         private TcpListener listener;
+        private string RSAPubKey;
+        private string RSAPrivateKey;
+        private byte[] CurrentAESKey;
+        private byte[] currentCurrentAESIV;
 
         public bool Closed { get; private set; }
+
+        public void setPublicEncryptionData(string RSAPubKey, string RSAPrivateKey)
+        {
+            this.RSAPubKey = RSAPubKey;
+            this.RSAPrivateKey = RSAPrivateKey;
+        }
 
         public Server()
         {
@@ -60,19 +70,6 @@ namespace CustomRemoteKey.Networking
             Main = new Thread(new ThreadStart(Round));
             Main.Start();
             Console.WriteLine("Socket Thread started.");
-            
-            //try
-            //{
-            //    symAl = new AesCryptoServiceProvider();
-            //    symAl.KeySize = 256;
-            //    symAl.BlockSize = SymAlBlockSize * 8;
-            //    symAl.Padding = PaddingMode.Zeros;
-            //    symAl.Mode = CipherMode.CBC;
-            //    symAl.GenerateIV();
-            //} catch
-            //{
-            //    Console.WriteLine("Failed to Init Encryption");
-            //}
         }
 
         internal void PrepareNewConnection()
@@ -114,7 +111,7 @@ namespace CustomRemoteKey.Networking
                     while ((i = stream.Read(buffer, 0, buffer.Length)) != 0)
                     {
                         // Translate data bytes to a ASCII string.
-                        data = System.Text.Encoding.ASCII.GetString(buffer, 0, i);
+                        data = Encoding.ASCII.GetString(buffer, 0, i);
                         Console.WriteLine("Received: {0}", data);
 
                         // Process the data sent by the client.
@@ -148,7 +145,6 @@ namespace CustomRemoteKey.Networking
                     Thread.Sleep(10);
                     Socket.BeginAccept(new AsyncCallback(OnConnectRequest), Socket);
                     SocketEvent.WaitOne();
-
                 }
             } catch(Exception ex)
             {
@@ -174,7 +170,7 @@ namespace CustomRemoteKey.Networking
         {
             StateObject state = (StateObject) ar.AsyncState;
             Socket handler = state.workingSocket;
-            int readSize = 0;
+            int readSize;
             try
             {
                 readSize = handler.EndReceive(ar);
@@ -186,8 +182,7 @@ namespace CustomRemoteKey.Networking
                 return;
             }
 
-            HandleData(state.buffer, readSize);
-            
+            HandleData(state.buffer, readSize, state);
         }
 
         void WriteCallback(IAsyncResult ar)
@@ -210,44 +205,39 @@ namespace CustomRemoteKey.Networking
             OnDeviceAdded?.Invoke(this, e);
         }
 
-        internal void HandleData(byte[] buffer, int readSize)
+        readonly string NEWCONNECTIONCODE = "NEWCON";
+
+        internal void HandleData(byte[] buffer, int readSize, StateObject state)
         {
             byte[] bb = new byte[readSize];
+            bool isSuccess = false;
             Array.Copy(buffer, bb, readSize);
-
+            var handle = state.workingSocket.Handle;
+            Console.WriteLine("Handle : {0}", handle);
             string decodedText = Encoding.UTF8.GetString(bb);
             Console.WriteLine("Binary Data : {0}", BitConverter.ToString(bb));
-            if (AcceptingNewConnection && decodedText.IndexOf("NEWCON") == 0)
+            if (AcceptingNewConnection && decodedText.IndexOf(NEWCONNECTIONCODE) == 0)
             {
-                int ModelNameEndPos = 7;
-                for (int i = 7; i < bb.Length; i++)
+                Console.WriteLine("NewConnection Requested");
+                byte[] encryptedData = new byte[readSize - Encoding.ASCII.GetByteCount(NEWCONNECTIONCODE)];
+                Array.Copy(bb, 6, encryptedData, 0, encryptedData.Length);
+                RSACryptoServiceProvider provider = new RSACryptoServiceProvider();
+                provider.FromXmlString(RSAPrivateKey);
+                byte[] aesKeyData;
+                try
                 {
-                    if (bb[i] == ',')
-                    {
-                        ModelNameEndPos = i;
-                        break;
-                    }
-                }
-                byte[] deviceNameB = new byte[ModelNameEndPos - 7];
-                byte[] hashVal = new byte[32];
-                Array.Copy(bb, 7, deviceNameB, 0, ModelNameEndPos - 7);
-                Array.Copy(bb, ModelNameEndPos + 1, hashVal, 0, hashVal.Length);
-
-                using (var sh256 = SHA256.Create())
+                    aesKeyData = provider.Decrypt(encryptedData, false);
+                    Console.WriteLine("keySize : {0}", aesKeyData.Length);
+                    bb = Encoding.ASCII.GetBytes("OK<EOM>");
+                    isSuccess = true;
+                    Console.WriteLine(BitConverter.ToString(aesKeyData));
+                } catch (CryptographicException)
                 {
-                    var hashed = sh256.ComputeHash(Encoding.ASCII.GetBytes(currentAccessKey));
-                    if (BitConverter.ToString(hashed) == BitConverter.ToString(hashVal))
-                    {
-                        Guid deviceId = Guid.NewGuid();
-                        DeviceAdded(new DeviceAddedEventArgs(Encoding.UTF8.GetString(deviceNameB), deviceId));
-                        string retData = "OK," + Environment.MachineName;
-
-                        bb = Encoding.UTF8.GetBytes("OK<EOM>");
-                    } else
-                    {
-                        bb = Encoding.UTF8.GetBytes("ERROR<EOM>");
-                    }
+                    bb = Encoding.ASCII.GetBytes("ERROR<EOM>");
+                    Console.WriteLine("Failed");
                 }
+                if (isSuccess)
+                    OnDeviceAdded?.Invoke(this, new DeviceAddedEventArgs("Test", Guid.NewGuid()));
             } else if (decodedText == "ConTes<EOM>")
             {
                 bb = Encoding.UTF8.GetBytes("OK<EOM>");
@@ -259,7 +249,7 @@ namespace CustomRemoteKey.Networking
                 MainWindow.Instance.HandleButtonReleased();
             } else
                 bb = Encoding.UTF8.GetBytes("TEST<EOM>");
-            //handler.BeginSend(bb, 0, bb.Length, 0, new AsyncCallback(WriteCallback), state);
+            state.workingSocket.BeginSend(bb, 0, bb.Length, 0, new AsyncCallback(WriteCallback), state);
         }
 
         public class StateObject

@@ -19,9 +19,9 @@ namespace Phone.Data
                 var context = new DeviceAddingContext();
                 var datas = str.Split(',');
                 int i = 0;
+                context.IpAddr = new string[datas.Length - 1];
                 foreach (var data in datas)
                 {
-                    context.IpAddr = new string[datas.Length - 1];
                     if (data.IndexOf(GetKeyFromKeyName("AccessKey")) == 0)
                         context.RSAPublicKey = data.Replace(GetKeyFromKeyName("AccessKey"), "");
                     else

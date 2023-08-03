@@ -2,16 +2,21 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:cv="clr-namespace:Camera.MAUI;assembly=Camera.MAUI"
-             x:Class="Phone.QRReading"
+             x:Class="Phone.QRReading" Disappearing="ContentPage_Disappearing"
              Title="QRReading">
     <ScrollView>
-        <VerticalStackLayout
+        <Grid>
+            <VerticalStackLayout
             Spacing="25" Padding="30,0" VerticalOptions="Center">
-            <cv:CameraView x:Name="Camera" WidthRequest="360" HeightRequest="440" CamerasLoaded="Camera_CamerasLoaded" BarCodeDetectionEnabled="True"
+                <cv:CameraView x:Name="Camera" WidthRequest="400" HeightRequest="400" CamerasLoaded="Camera_CamerasLoaded" BarCodeDetectionEnabled="True"
                            BarcodeDetected="Camera_BarcodeDetected">
-                
-            </cv:CameraView>
-            
-        </VerticalStackLayout>
+                </cv:CameraView>
+                <Label Text="Debug Scan Mode"/>
+                <Switch x:Name="DebugMode"/>
+                <Label Text="Torch Enabled"/>
+                <Switch x:Name="Torch" Toggled="Torch_Toggled"/>
+
+            </VerticalStackLayout>
+        </Grid>
     </ScrollView>
 </ContentPage>
