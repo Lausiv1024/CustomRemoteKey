@@ -8,10 +8,11 @@
         <Grid>
             <VerticalStackLayout
             Spacing="25" Padding="30,0" VerticalOptions="Center">
+                <ActivityIndicator x:Name="Processing" IsRunning="False"/>
                 <cv:CameraView x:Name="Camera" WidthRequest="400" HeightRequest="400" CamerasLoaded="Camera_CamerasLoaded" BarCodeDetectionEnabled="True"
                            BarcodeDetected="Camera_BarcodeDetected">
                 </cv:CameraView>
-                <Label Text="Debug Scan Mode"/>
+                <Label x:Name="AESEncryptionData" Text="Debug Scan Mode"/>
                 <Switch x:Name="DebugMode"/>
                 <Label Text="Torch Enabled"/>
                 <Switch x:Name="Torch" Toggled="Torch_Toggled"/>

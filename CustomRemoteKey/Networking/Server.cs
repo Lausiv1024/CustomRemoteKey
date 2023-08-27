@@ -17,6 +17,8 @@ using Windows.Storage.Streams;
 using Windows.Networking.Sockets;
 using System.IO;
 using Windows.ApplicationModel.VoiceCommands;
+using System.Windows.Media.Effects;
+using Windows.Security.Cryptography.Certificates;
 
 namespace CustomRemoteKey.Networking
 {
@@ -48,6 +50,8 @@ namespace CustomRemoteKey.Networking
         private string RSAPrivateKey;
         private byte[] CurrentAESKey;
         private byte[] currentCurrentAESIV;
+        private Dictionary<string, Session> Sessions = new Dictionary<string, Session>();
+        
 
         public bool Closed { get; private set; }
 
@@ -80,57 +84,6 @@ namespace CustomRemoteKey.Networking
         private Stream GetNetworkStream()
         {
             return new NetworkStream(Socket);
-        }
-
-        private void Round2()
-        {
-            
-            try
-            {
-                listener = new TcpListener(IPAddress.Parse("127.0.0.1"), 13500);
-                listener.Start();
-                byte[] buffer = new byte[256];
-                string data = null;
-                while (!Closed)
-                {
-                    Console.Write("Waiting for a connection... ");
-
-                    // Perform a blocking call to accept requests.
-                    // You could also use server.AcceptSocket() here.
-                    TcpClient client = listener.AcceptTcpClient();
-                    Console.WriteLine("Connected!");
-
-                    data = null;
-
-                    // Get a stream object for reading and writing
-                    NetworkStream stream = client.GetStream();
-
-                    int i;
-
-                    // Loop to receive all the data sent by the client.
-                    while ((i = stream.Read(buffer, 0, buffer.Length)) != 0)
-                    {
-                        // Translate data bytes to a ASCII string.
-                        data = Encoding.ASCII.GetString(buffer, 0, i);
-                        Console.WriteLine("Received: {0}", data);
-
-                        // Process the data sent by the client.
-                        data = data.ToUpper();
-
-                        byte[] msg = Encoding.ASCII.GetBytes(data);
-
-                        // Send back a response.
-                        stream.Write(msg, 0, msg.Length);
-                        Console.WriteLine("Sent: {0}", data);
-                    }
-                }
-            } catch(SocketException e)
-            {
-                Console.WriteLine("SocketException: {0}", e);
-            } finally
-            {
-                listener.Stop();
-            }
         }
 
         void Round()
@@ -170,6 +123,7 @@ namespace CustomRemoteKey.Networking
         {
             StateObject state = (StateObject) ar.AsyncState;
             Socket handler = state.workingSocket;
+            var addr = state.workingSocket.RemoteEndPoint.ToString();
             int readSize;
             try
             {
@@ -179,6 +133,7 @@ namespace CustomRemoteKey.Networking
             }
             if (readSize < 1)
             {
+                Sessions.Remove(addr);
                 return;
             }
 
@@ -207,14 +162,41 @@ namespace CustomRemoteKey.Networking
 
         readonly string NEWCONNECTIONCODE = "NEWCON";
 
+        const int KEYSIZE = 32, IVSIZE = 16;
         internal void HandleData(byte[] buffer, int readSize, StateObject state)
         {
             byte[] bb = new byte[readSize];
             bool isSuccess = false;
             Array.Copy(buffer, bb, readSize);
             var handle = state.workingSocket.Handle;
+            string addr = state.workingSocket.AddressFamily.ToString();
             Console.WriteLine("Handle : {0}", handle);
-            string decodedText = Encoding.UTF8.GetString(bb);
+            string decodedText = string.Empty;
+            bool encryptedMode = Sessions.TryGetValue(state.workingSocket.RemoteEndPoint.ToString(), out Session session);
+            Console.WriteLine(BitConverter.ToString(bb));
+            if (encryptedMode && session.ConnectionStage != 0)
+            {
+                using (Aes aes = Aes.Create())
+                {
+                    aes.Key = session.AESKey; aes.IV = session.AESIV; aes.BlockSize = 128; aes.KeySize = 256;//aes.Mode = CipherMode.CBC; aes.Padding = PaddingMode.PKCS7;
+
+                    ICryptoTransform decryptor = aes.CreateDecryptor(aes.Key, aes.IV);
+
+                    using (MemoryStream msDecrypt = new MemoryStream(bb))
+                    {
+                        using (CryptoStream csDecrypt =  new CryptoStream(msDecrypt, decryptor, CryptoStreamMode.Read))
+                        {
+                            using (StreamReader reader = new StreamReader(csDecrypt))
+                            {
+                                decodedText = reader.ReadToEnd();
+                            }
+                        }
+                    }
+                }
+            } else
+            {
+                decodedText = Encoding.UTF8.GetString(bb);
+            }
             Console.WriteLine("Binary Data : {0}", BitConverter.ToString(bb));
             if (AcceptingNewConnection && decodedText.IndexOf(NEWCONNECTIONCODE) == 0)
             {
@@ -223,13 +205,27 @@ namespace CustomRemoteKey.Networking
                 Array.Copy(bb, 6, encryptedData, 0, encryptedData.Length);
                 RSACryptoServiceProvider provider = new RSACryptoServiceProvider();
                 provider.FromXmlString(RSAPrivateKey);
+
+                var currentSession = new Session();
+                Sessions.Add(state.workingSocket.RemoteEndPoint.ToString(), currentSession);
+                
                 byte[] aesKeyData;
                 try
                 {
                     aesKeyData = provider.Decrypt(encryptedData, false);
+
                     Console.WriteLine("keySize : {0}", aesKeyData.Length);
+                    byte[] key = new byte[KEYSIZE], iv = new byte[IVSIZE];
+
+                    Array.Copy(aesKeyData, key, KEYSIZE);
+                    Array.Copy(aesKeyData, key.Length, iv, 0, IVSIZE);
+
+                    currentSession.AESKey = key;
+                    currentSession.AESIV = iv;
+
                     bb = Encoding.ASCII.GetBytes("OK<EOM>");
                     isSuccess = true;
+
                     Console.WriteLine(BitConverter.ToString(aesKeyData));
                 } catch (CryptographicException)
                 {
@@ -237,8 +233,20 @@ namespace CustomRemoteKey.Networking
                     Console.WriteLine("Failed");
                 }
                 if (isSuccess)
-                    OnDeviceAdded?.Invoke(this, new DeviceAddedEventArgs("Test", Guid.NewGuid()));
-            } else if (decodedText == "ConTes<EOM>")
+                {
+                    currentSession.ConnectionStage++;
+                }
+            }
+            else if (decodedText.IndexOf("DENAME") == 0)
+            {
+                Session current = Sessions[addr];
+                string deviceName = decodedText.Replace("DENAME", "").Replace("<EOM>", "");
+                Guid guid = Guid.NewGuid();
+                OnDeviceAdded?.Invoke(this, new DeviceAddedEventArgs(deviceName, guid));
+                current.DeviceGUID = guid;
+                bb = Encoding.ASCII.GetBytes("OK<EOM>");
+            }
+            else if (decodedText == "ConTes<EOM>")
             {
                 bb = Encoding.UTF8.GetBytes("OK<EOM>");
             } else if (decodedText == "1")
@@ -249,6 +257,28 @@ namespace CustomRemoteKey.Networking
                 MainWindow.Instance.HandleButtonReleased();
             } else
                 bb = Encoding.UTF8.GetBytes("TEST<EOM>");
+            
+            if (session != null && session.ConnectionStage != 0)
+            {
+                using (Aes aes = Aes.Create())
+                {
+                    aes.Key = session.AESKey; aes.IV = session.AESIV;aes.KeySize = 256; aes.BlockSize = 128; //aes.Mode = CipherMode.CBC; aes.Padding = PaddingMode.PKCS7;
+
+                    ICryptoTransform encryptor = aes.CreateEncryptor();
+
+                    using (MemoryStream ms = new MemoryStream())
+                    {
+                        using (CryptoStream csEncrypt = new CryptoStream(ms, encryptor, CryptoStreamMode.Write))
+                        {
+                            using (StreamWriter sw = new StreamWriter(csEncrypt))
+                            {
+                                sw.Write(bb);
+                            }
+                            bb = ms.ToArray();
+                        }
+                    }
+                }
+            }
             state.workingSocket.BeginSend(bb, 0, bb.Length, 0, new AsyncCallback(WriteCallback), state);
         }
 
@@ -257,6 +287,15 @@ namespace CustomRemoteKey.Networking
             public Socket workingSocket { get; set; }
             public const int BUFFER_SIZE = 1024;
             internal byte[] buffer = new byte[BUFFER_SIZE];
+        }
+
+        internal class Session
+        {
+            internal int ConnectionStage = 0;
+            internal byte[] AESKey;
+            internal byte[] AESIV;
+            internal Guid DeviceGUID;
+            internal string DeviceName;
         }
     }
 }

@@ -37,6 +37,10 @@ public partial class QRReading : ContentPage
         await Camera.StopCameraAsync();
         Camera.BarCodeDetectionEnabled = false;
         scanned = true;
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            Processing.IsRunning = true;
+        });
         if (DebugMode.IsToggled)
         {
             MainThread.BeginInvokeOnMainThread(async() =>
@@ -62,19 +66,20 @@ public partial class QRReading : ContentPage
 
         aes.BlockSize = 128;
         aes.KeySize = 256;
-        aes.Mode = CipherMode.CBC;
-        aes.Padding = PaddingMode.PKCS7;
+        //aes.Mode = CipherMode.CBC;
+        //aes.Padding = PaddingMode.PKCS7;
         aes.GenerateIV();
         aes.GenerateKey();
         byte[] keyData = new byte[aes.Key.Length + aes.IV.Length];
+        MainThread.BeginInvokeOnMainThread(() => AESEncryptionData.Text = $"Aes Key : {BitConverter.ToString(aes.Key)}\nAes IV : {BitConverter.ToString(aes.IV)}");
         Array.Copy(aes.Key, 0, keyData, 0, aes.Key.Length);
         Array.Copy(aes.IV, 0, keyData, aes.Key.Length, aes.IV.Length);
         DeviceAddingContext context = DeviceAddingContext.Parse(scannedText);
         if (context != null && context.IpAddr.Length == 0)
         {
-            MainThread.BeginInvokeOnMainThread(() =>
+            MainThread.BeginInvokeOnMainThread(async() =>
             {
-                MakeToast("Format Error");
+                await MakeToast("Format Error");
             });
             return;
         }
@@ -84,11 +89,12 @@ public partial class QRReading : ContentPage
         byte[] encryptedCommonKey = rsa.Encrypt(keyData, false);
 
         aes.Clear();
-        if (!await MainPage.Instance.ConnectTo(context.IpAddr, encryptedCommonKey))
+        if (!await MainPage.Instance.ConnectTo(context.IpAddr, encryptedCommonKey, aes.Key, aes.IV))
         {
-            MainThread.BeginInvokeOnMainThread(() =>
+            MainThread.BeginInvokeOnMainThread(async () =>
             {
-                MakeToast("Ú‘±¸”s");
+                await MakeToast("Ú‘±¸”s");
+                await Navigation.PopAsync();
             });
             return;
         }

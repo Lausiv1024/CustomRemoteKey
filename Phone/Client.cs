@@ -12,11 +12,12 @@ namespace Phone
         string Address;
         string AccessKey;
         bool connected;
+        int connectionStage = 0;
         private const int PORT = 60001;
 
         TcpClient client;
         
-        public Client() 
+        public Client()
         {
             new Timer((state) =>
             {

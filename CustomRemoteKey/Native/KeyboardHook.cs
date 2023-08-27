@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 using Windows.ApplicationModel.Activation;
 using Windows.ApplicationModel.VoiceCommands;
-using static CustomRemoteKey.Native.KeyboardHook;
 using System.Windows.Forms;
 using System.Windows.Input;
 using System.Diagnostics;
@@ -26,7 +25,6 @@ namespace CustomRemoteKey.Native
         {
             public uint vkCode;
             public uint scanCode;
-
         }
 
         public enum KBDLLHOOKSTRUCTFlags : uint

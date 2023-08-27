@@ -5,6 +5,7 @@ using System.Text;
 using System;
 using System.Net;
 using Microsoft.Maui.Controls.Xaml;
+using System.Security.Cryptography;
 
 namespace Phone
 {
@@ -122,7 +123,7 @@ namespace Phone
 
         }
 
-        public async Task<bool> ConnectTo(string[] ipAddr, byte[] encryptedCommonKey)
+        public async Task<bool> ConnectTo(string[] ipAddr, byte[] encryptedCommonKey, byte[] aesKey, byte[] aesIV)
         {
             if (ipAddr == null) return false;
             if (ipAddr.Length == 0) return false;
@@ -164,7 +165,12 @@ namespace Phone
             var received = await Client.Client.ReceiveAsync(buffer, SocketFlags.None);
             if (Encoding.ASCII.GetString(buffer, 0, received) == "OK<EOM>")
             {
+                string deviceNameCmd = "DENAME" + DeviceInfo.Current.Model + "<EOM>";
+                sendEncryptionData(Encoding.UTF8.GetBytes(deviceNameCmd), aesKey, aesIV);
+                var result = await receiveAndDecryptDataAsync(aesKey, aesIV);
+                if (result != "OK<EOM>") return false;
                 IsConnected = true;
+
                 MainThread.BeginInvokeOnMainThread(() =>
                 {
                     Navigation.PopToRootAsync();
@@ -174,6 +180,63 @@ namespace Phone
                 DispAlertFromOtherThread("ERROR", "クライアントに正常に接続できませんでした。\nもう一度やり直してください。", "OK");
             }
             return true;
+        }
+
+        private void sendEncryptionData(byte[] data, byte[] key, byte[] iv)
+        {
+            using (Aes aes = Aes.Create())
+            {
+                aes.BlockSize = 128;
+                aes.KeySize = 256;
+                aes.Key = key;
+                aes.IV = iv;
+                
+                ICryptoTransform cryptoTransform = aes.CreateEncryptor(key, iv);
+
+                using (MemoryStream ems = new MemoryStream())
+                {
+                    using (CryptoStream stream = new CryptoStream(ems, cryptoTransform, CryptoStreamMode.Write))
+                    {
+                        using (StreamWriter aesWriter =  new StreamWriter(stream))
+                        {
+                            aesWriter.Write(data);
+                        }
+                        
+                        Client.Client.Send(ems.ToArray());
+                    }
+                }
+            }
+        }
+
+        private async Task<string> receiveAndDecryptDataAsync(byte[] key,byte[] iv)
+        {
+            byte[] buffer = new byte[1024];
+
+            var received = await Client.Client.ReceiveAsync(buffer, SocketFlags.None);
+            byte[] receivedData = new byte[received];
+            Array.Copy(buffer, receivedData, receivedData.Length);
+
+            
+            using (Aes aes = Aes.Create())
+            {
+                aes.Key = key;
+                aes.IV = iv;
+                aes.Mode = CipherMode.CBC;
+                aes.Padding = PaddingMode.PKCS7;
+
+                ICryptoTransform decryptor = aes.CreateDecryptor();
+
+                using (MemoryStream msDecryptor = new MemoryStream(receivedData))
+                {
+                    using (CryptoStream csDecryptor = new CryptoStream(msDecryptor, decryptor, CryptoStreamMode.Read))
+                    {
+                        using (StreamReader streamReader = new StreamReader(csDecryptor))
+                        {
+                            return streamReader.ReadToEnd();
+                        }
+                    }
+                }
+            }
         }
 
         IPAddress IpFromString(string ip)
@@ -222,8 +285,6 @@ namespace Phone
         {
             HapticFeedback.Default.Perform(HapticFeedbackType.LongPress);
             Button button = (Button)sender;
-            if (ProfileMode == 1)
-                await DisplayAlert("Pressed", $"Pressed Button : [{Grid.GetColumn(button)}, {Grid.GetRow(button)}]", "OK");
             hapticCooldown[Grid.GetColumn(button), Grid.GetRow(button)] = true;
             await Task.Delay(100);
             hapticCooldown[Grid.GetColumn(button),Grid.GetRow(button)] = false;
