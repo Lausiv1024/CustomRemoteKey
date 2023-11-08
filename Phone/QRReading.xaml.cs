@@ -28,6 +28,8 @@ public partial class QRReading : ContentPage
         }
     }
 
+    //KeySize = 256
+    const int KEYSIZE = 256, BLOCKSIZE = 128;
     private async void Camera_BarcodeDetected(object sender, Camera.MAUI.ZXingHelper.BarcodeEventArgs args)
     {
         if (scanned) return;
@@ -36,38 +38,37 @@ public partial class QRReading : ContentPage
         Console.WriteLine("Scanned Data : \n{0}", scannedText);
         await Camera.StopCameraAsync();
         Camera.BarCodeDetectionEnabled = false;
-        scanned = true;
         MainThread.BeginInvokeOnMainThread(() =>
         {
             Processing.IsRunning = true;
         });
-        if (DebugMode.IsToggled)
-        {
-            MainThread.BeginInvokeOnMainThread(async() =>
-            {
-                //await DisplayAlert("Detected Code", scannedText, "OK");
-                await MakeToast(scannedText);
-                await Task.Delay(1000);
-                scanned = false;
-                Camera.BarCodeDetectionEnabled = true;
-                await Camera.StartCameraAsync();
-            });
-            if (scannedText.IndexOf("http://") == 0 || scannedText.IndexOf("https://") == 0)
-            {
-                Uri uri = new(scannedText);
-                await Browser.Default.OpenAsync(uri, BrowserLaunchMode.SystemPreferred);
-            }
+        //if (DebugMode.IsToggled)
+        //{
+        //    MainThread.BeginInvokeOnMainThread(async() =>
+        //    {
+        //        //await DisplayAlert("Detected Code", scannedText, "OK");
+        //        await MakeToast(scannedText);
+        //        await Task.Delay(1000);
+        //        scanned = false;
+        //        Camera.BarCodeDetectionEnabled = true;
+        //        await Camera.StartCameraAsync();
+        //    });
+        //    if (scannedText.IndexOf("http://") == 0 || scannedText.IndexOf("https://") == 0)
+        //    {
+        //        Uri uri = new(scannedText);
+        //        await Browser.Default.OpenAsync(uri, BrowserLaunchMode.SystemPreferred);
+        //    }
 
-            return;
-        };
+        //    return;
+        //};
 
-        await Task.Delay(500);
+        
         var aes = Aes.Create();
 
-        aes.BlockSize = 128;
-        aes.KeySize = 256;
-        //aes.Mode = CipherMode.CBC;
-        //aes.Padding = PaddingMode.PKCS7;
+        aes.BlockSize = BLOCKSIZE;
+        aes.KeySize = KEYSIZE;
+        aes.Mode = CipherMode.CBC;
+        aes.Padding = PaddingMode.PKCS7;
         aes.GenerateIV();
         aes.GenerateKey();
         byte[] keyData = new byte[aes.Key.Length + aes.IV.Length];
@@ -75,6 +76,7 @@ public partial class QRReading : ContentPage
         Array.Copy(aes.Key, 0, keyData, 0, aes.Key.Length);
         Array.Copy(aes.IV, 0, keyData, aes.Key.Length, aes.IV.Length);
         DeviceAddingContext context = DeviceAddingContext.Parse(scannedText);
+        await Task.Delay(500);
         if (context != null && context.IpAddr.Length == 0)
         {
             MainThread.BeginInvokeOnMainThread(async() =>

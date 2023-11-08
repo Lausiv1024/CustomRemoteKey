@@ -33,7 +33,6 @@ namespace CustomRemoteKey
             code = 114514;
             MainWindow.Instance.MainServer.OnDeviceAdded += DeviceAdded;
             property = new DeviceProperty();
-
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)

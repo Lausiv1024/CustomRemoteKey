@@ -65,6 +65,7 @@
     <Compile Include="Behaviours\PlaySound.cs" />
     <Compile Include="Behaviours\Registry.cs" />
     <Compile Include="ConnectionSetting.cs" />
+    <Compile Include="CRKConstants.cs" />
     <Compile Include="CRKDConstances.cs" />
     <Compile Include="DeviceProperty.cs" />
     <Compile Include="Event\Args\DeviceAddedEventArgs.cs" />

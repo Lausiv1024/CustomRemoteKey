@@ -6,6 +6,8 @@ using System;
 using System.Net;
 using Microsoft.Maui.Controls.Xaml;
 using System.Security.Cryptography;
+using System.Linq;
+using Microsoft.Maui.Animations;
 
 namespace Phone
 {
@@ -123,45 +125,56 @@ namespace Phone
 
         }
 
+        public async Task<TcpClient> TryConnectAsync(string ipAddr)
+        {
+            TcpClient client = new TcpClient();
+            try
+            {
+                await client.ConnectAsync(IpFromString(ipAddr), PORT);
+            } catch
+            {
+                client.Close();
+                return null;
+            }
+            if (IsConnected) client.Close();
+            return client;
+        }
+        //ビット数での定義
+        const int KEYSIZE = 256, IVSIZE = 128, BLOCKSIZE = 128, BUFFERSIZE = 1024;
         public async Task<bool> ConnectTo(string[] ipAddr, byte[] encryptedCommonKey, byte[] aesKey, byte[] aesIV)
         {
             if (ipAddr == null) return false;
             if (ipAddr.Length == 0) return false;
-            Thread[] threads = new Thread[ipAddr.Length];
-            int i = 0;
+
+            var tryConnectTasks = new List<Task<TcpClient>>();
             foreach (string ip in ipAddr)
             {
-                //threads[i] = new Thread(new ThreadStart(async() =>
-                //{
-
-                //}));
-                //指定されたIPで接続失敗したら次のＩＰで接続を試行する。
-                try
-                {
-                    await Client.ConnectAsync(IpFromString(ip), PORT);
-                    IsConnected = true;
-                    //foreach (var thread in threads)
-                    //{
-                    //    if (Thread.CurrentThread.ManagedThreadId != thread.ManagedThreadId)
-                    //    {
-                    //        thread.Abort();
-                    //    }
-                    //}
-                } catch (SocketException ex)
-                {
-                    Console.WriteLine(ex);
-                }
-                i++;
+                tryConnectTasks.Add(TryConnectAsync(ip));
             }
+            
+            await Task.WhenAny(tryConnectTasks);
+            await Task.Delay(500);
 
-            if (!IsConnected) return false;
+            foreach (var task in tryConnectTasks)
+            {
+                if (task.IsCompleted)
+                {
+                    var client = task.Result;
+                    if (client == null) continue;
+                    if (!IsConnected)
+                    {
+                        Client = client;
+                        IsConnected = true;
+                    }
+                }
+            }
 
             var newConnection = Encoding.UTF8.GetBytes("NEWCON");
             var sendData = new byte[newConnection.Length + encryptedCommonKey.Length];
             Array.Copy(newConnection, sendData, newConnection.Length);
             Array.Copy(encryptedCommonKey, 0, sendData, newConnection.Length, encryptedCommonKey.Length);
             Client.Client.Send(sendData);
-            byte[] buffer = new byte[1024];
+            byte[] buffer = new byte[BUFFERSIZE];
             var received = await Client.Client.ReceiveAsync(buffer, SocketFlags.None);
             if (Encoding.ASCII.GetString(buffer, 0, received) == "OK<EOM>")
             {
@@ -178,6 +191,7 @@ namespace Phone
             } else
             {
                 DispAlertFromOtherThread("ERROR", "クライアントに正常に接続できませんでした。\nもう一度やり直してください。", "OK");
+                return false;
             }
             return true;
         }
@@ -186,39 +200,43 @@ namespace Phone
         {
             using (Aes aes = Aes.Create())
             {
-                aes.BlockSize = 128;
-                aes.KeySize = 256;
+                aes.BlockSize = BLOCKSIZE;
+                aes.KeySize = KEYSIZE;
                 aes.Key = key;
                 aes.IV = iv;
-                
-                ICryptoTransform cryptoTransform = aes.CreateEncryptor(key, iv);
+                aes.Padding = PaddingMode.PKCS7;
+                aes.Mode = CipherMode.CBC;
+                ICryptoTransform cryptoTransform = aes.CreateEncryptor();
+
 
                 using (MemoryStream ems = new MemoryStream())
                 {
                     using (CryptoStream stream = new CryptoStream(ems, cryptoTransform, CryptoStreamMode.Write))
                     {
-                        using (StreamWriter aesWriter =  new StreamWriter(stream))
+                        using (StreamWriter aesWriter = new StreamWriter(stream))
                         {
                             aesWriter.Write(data);
                         }
-                        
+
                         Client.Client.Send(ems.ToArray());
                     }
                 }
+
             }
         }
 
         private async Task<string> receiveAndDecryptDataAsync(byte[] key,byte[] iv)
         {
-            byte[] buffer = new byte[1024];
+            byte[] buffer = new byte[BUFFERSIZE];
 
             var received = await Client.Client.ReceiveAsync(buffer, SocketFlags.None);
             byte[] receivedData = new byte[received];
             Array.Copy(buffer, receivedData, receivedData.Length);
 
-            
             using (Aes aes = Aes.Create())
             {
+                aes.BlockSize = BLOCKSIZE;
+                aes.KeySize = KEYSIZE;
                 aes.Key = key;
                 aes.IV = iv;
                 aes.Mode = CipherMode.CBC;
