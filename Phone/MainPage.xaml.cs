@@ -26,9 +26,6 @@ namespace Phone
 
         int tickCount;
 
-        string host = "192.168.40.95";
-        private const int PORT = 60001;
-
         public static MainPage Instance { get; private set; }
         
 
@@ -68,7 +65,6 @@ namespace Phone
 
             Slider label = new Slider();
             label.Margin = new Thickness(10);
-            //label.Background = new SolidColorBrush(Colors.Indigo);
             
             Grid.SetRow(label, ButtonCountY);
             Grid.SetColumnSpan(label, ButtonCountX);
@@ -130,7 +126,7 @@ namespace Phone
             TcpClient client = new TcpClient();
             try
             {
-                await client.ConnectAsync(IpFromString(ipAddr), PORT);
+                await client.ConnectAsync(IpFromString(ipAddr), CRKConstants.TCP_PORT);
             } catch
             {
                 client.Close();
@@ -139,8 +135,7 @@ namespace Phone
             if (IsConnected) client.Close();
             return client;
         }
-        //ビット数での定義
-        const int KEYSIZE = 256, IVSIZE = 128, BLOCKSIZE = 128, BUFFERSIZE = 1024;
+        
         public async Task<bool> ConnectTo(string[] ipAddr, byte[] encryptedCommonKey, byte[] aesKey, byte[] aesIV)
         {
             if (ipAddr == null) return false;
@@ -174,7 +169,7 @@ namespace Phone
             Array.Copy(newConnection, sendData, newConnection.Length);
             Array.Copy(encryptedCommonKey, 0, sendData, newConnection.Length, encryptedCommonKey.Length);
             Client.Client.Send(sendData);
-            byte[] buffer = new byte[BUFFERSIZE];
+            byte[] buffer = new byte[CRKConstants.BUFFER_SIZE];
             var received = await Client.Client.ReceiveAsync(buffer, SocketFlags.None);
             if (Encoding.ASCII.GetString(buffer, 0, received) == "OK<EOM>")
             {
@@ -200,34 +195,20 @@ namespace Phone
         {
             using (Aes aes = Aes.Create())
             {
-                aes.BlockSize = BLOCKSIZE;
-                aes.KeySize = KEYSIZE;
+                aes.BlockSize = CRKConstants.AES_BLOCKSIZE;
+                aes.KeySize = CRKConstants.AES_KEYSIZE;
                 aes.Key = key;
                 aes.IV = iv;
                 aes.Padding = PaddingMode.PKCS7;
                 aes.Mode = CipherMode.CBC;
-                ICryptoTransform cryptoTransform = aes.CreateEncryptor();
-
-
-                using (MemoryStream ems = new MemoryStream())
-                {
-                    using (CryptoStream stream = new CryptoStream(ems, cryptoTransform, CryptoStreamMode.Write))
-                    {
-                        using (StreamWriter aesWriter = new StreamWriter(stream))
-                        {
-                            aesWriter.Write(data);
-                        }
-
-                        Client.Client.Send(ems.ToArray());
-                    }
-                }
-
+                ICryptoTransform encryptor = aes.CreateEncryptor();
+                Client.Client.Send(encryptor.TransformFinalBlock(data, 0, data.Length));
             }
         }
 
         private async Task<string> receiveAndDecryptDataAsync(byte[] key,byte[] iv)
         {
-            byte[] buffer = new byte[BUFFERSIZE];
+            byte[] buffer = new byte[CRKConstants.BUFFER_SIZE];
 
             var received = await Client.Client.ReceiveAsync(buffer, SocketFlags.None);
             byte[] receivedData = new byte[received];
@@ -235,8 +216,8 @@ namespace Phone
 
             using (Aes aes = Aes.Create())
             {
-                aes.BlockSize = BLOCKSIZE;
-                aes.KeySize = KEYSIZE;
+                aes.BlockSize = CRKConstants.AES_BLOCKSIZE;
+                aes.KeySize = CRKConstants.AES_KEYSIZE;
                 aes.Key = key;
                 aes.IV = iv;
                 aes.Mode = CipherMode.CBC;
@@ -244,16 +225,8 @@ namespace Phone
 
                 ICryptoTransform decryptor = aes.CreateDecryptor();
 
-                using (MemoryStream msDecryptor = new MemoryStream(receivedData))
-                {
-                    using (CryptoStream csDecryptor = new CryptoStream(msDecryptor, decryptor, CryptoStreamMode.Read))
-                    {
-                        using (StreamReader streamReader = new StreamReader(csDecryptor))
-                        {
-                            return streamReader.ReadToEnd();
-                        }
-                    }
-                }
+                return Encoding.UTF8.GetString(decryptor.TransformFinalBlock(receivedData, 0, receivedData.Length));
+
             }
         }
 

@@ -28,8 +28,6 @@ public partial class QRReading : ContentPage
         }
     }
 
-    //KeySize = 256
-    const int KEYSIZE = 256, BLOCKSIZE = 128;
     private async void Camera_BarcodeDetected(object sender, Camera.MAUI.ZXingHelper.BarcodeEventArgs args)
     {
         if (scanned) return;
@@ -65,8 +63,8 @@ public partial class QRReading : ContentPage
         
         var aes = Aes.Create();
 
-        aes.BlockSize = BLOCKSIZE;
-        aes.KeySize = KEYSIZE;
+        aes.BlockSize = CRKConstants.AES_BLOCKSIZE;
+        aes.KeySize = CRKConstants.AES_KEYSIZE;
         aes.Mode = CipherMode.CBC;
         aes.Padding = PaddingMode.PKCS7;
         aes.GenerateIV();
@@ -90,8 +88,8 @@ public partial class QRReading : ContentPage
         rsa.FromXmlString(context.RSAPublicKey);
         byte[] encryptedCommonKey = rsa.Encrypt(keyData, false);
 
-        aes.Clear();
-        if (!await MainPage.Instance.ConnectTo(context.IpAddr, encryptedCommonKey, aes.Key, aes.IV))
+        
+        if (!await MainPage.Instance.ConnectTo(context.IpAddr, encryptedCommonKey, (byte[])aes.Key.Clone(), (byte[]) aes.IV.Clone()))
         {
             MainThread.BeginInvokeOnMainThread(async () =>
             {
@@ -100,6 +98,7 @@ public partial class QRReading : ContentPage
             });
             return;
         }
+        aes.Clear();
         Camera.BarCodeDetectionEnabled = true;
         scanned = false;
         MainThread.BeginInvokeOnMainThread(async () =>

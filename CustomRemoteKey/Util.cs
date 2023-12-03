@@ -77,7 +77,18 @@ namespace CustomRemoteKey
             RSACryptoServiceProvider rsa = new RSACryptoServiceProvider();
             publicKey = rsa.ToXmlString(false);
             privatekey = rsa.ToXmlString(true);
-            
+        }
+
+        internal static Aes CreateDefaultAES(byte[] key, byte[] iv)
+        {
+            Aes aes = Aes.Create();
+            aes.KeySize = CRKConstants.AES_KEYSIZE;
+            aes.BlockSize = CRKConstants.AES_BLOCKSIZE;
+            aes.Padding = PaddingMode.PKCS7;
+            aes.Mode = CipherMode.CBC;
+            aes.Key = key;
+            aes.IV = iv;
+            return aes;
         }
     }
 }

@@ -162,14 +162,13 @@ namespace CustomRemoteKey.Networking
 
         readonly string NEWCONNECTIONCODE = "NEWCON";
 
-        const int KEYSIZE = 256, IVSIZE = 128, BLOCKSIZE = 128, BUFFERSIZE = 1024;
         internal void HandleData(byte[] buffer, int readSize, StateObject state)
         {
             byte[] bb = new byte[readSize];
             bool isSuccess = false;
             Array.Copy(buffer, bb, readSize);
             var handle = state.workingSocket.Handle;
-            string addr = state.workingSocket.AddressFamily.ToString();
+            string addr = state.workingSocket.RemoteEndPoint.ToString();
             Console.WriteLine("Handle : {0}", handle);
             string decodedText = string.Empty;
             bool encryptedMode = Sessions.TryGetValue(state.workingSocket.RemoteEndPoint.ToString(), out Session session);
@@ -177,22 +176,10 @@ namespace CustomRemoteKey.Networking
             if (encryptedMode && session.ConnectionStage != 0)
             {
                 Console.WriteLine(session);
-                using (Aes aes = Aes.Create())
+                using (Aes aes = Util.CreateDefaultAES(session.AESKey, session.AESIV))
                 {
-                    aes.BlockSize = BLOCKSIZE; aes.KeySize = KEYSIZE; aes.Key = session.AESKey; aes.IV = session.AESIV; aes.Mode = CipherMode.CBC; aes.Padding = PaddingMode.PKCS7;
-
                     ICryptoTransform decryptor = aes.CreateDecryptor();
-                    
-                    //using (MemoryStream msDecrypt = new MemoryStream(bb))
-                    //{
-                    //    using (CryptoStream csDecrypt =  new CryptoStream(msDecrypt, decryptor, CryptoStreamMode.Read))
-                    //    {
-                    //        using (StreamReader reader = new StreamReader(csDecrypt))
-                    //        {
-                    //            decodedText = reader.ReadToEnd();
-                    //        }
-                    //    }
-                    //}
+
                     decodedText = Encoding.UTF8.GetString(decryptor.TransformFinalBlock(bb, 0, bb.Length));
                 }
             } else
@@ -217,10 +204,10 @@ namespace CustomRemoteKey.Networking
                     aesKeyData = provider.Decrypt(encryptedData, false);
 
                     Console.WriteLine("keySize : {0}", aesKeyData.Length);
-                    byte[] key = new byte[KEYSIZE / 8], iv = new byte[IVSIZE / 8];
+                    byte[] key = new byte[CRKConstants.AES_KEYSIZE / 8], iv = new byte[CRKConstants.AES_IVSIZE / 8];
 
-                    Array.Copy(aesKeyData, key, KEYSIZE / 8);
-                    Array.Copy(aesKeyData, key.Length, iv, 0, IVSIZE / 8);//
+                    Array.Copy(aesKeyData, key, CRKConstants.AES_KEYSIZE / 8);
+                    Array.Copy(aesKeyData, key.Length, iv, 0, CRKConstants.AES_IVSIZE / 8);
 
                     currentSession.AESKey = key;
                     currentSession.AESIV = iv;
@@ -262,23 +249,9 @@ namespace CustomRemoteKey.Networking
             
             if (session != null && session.ConnectionStage != 0)
             {
-                using (Aes aes = Aes.Create())
+                using (Aes aes = Util.CreateDefaultAES(session.AESKey, session.AESIV))
                 {
-                    aes.KeySize = KEYSIZE; aes.BlockSize = BLOCKSIZE; aes.Key = session.AESKey; aes.IV = session.AESIV; aes.Mode = CipherMode.CBC; aes.Padding = PaddingMode.PKCS7;
-
-                    ICryptoTransform encryptor = aes.CreateEncryptor(aes.Key, aes.IV);
-
-                    //using (MemoryStream ms = new MemoryStream())
-                    //{
-                    //    using (CryptoStream csEncrypt = new CryptoStream(ms, encryptor, CryptoStreamMode.Write))
-                    //    {
-                    //        using (StreamWriter sw = new StreamWriter(csEncrypt))
-                    //        {
-                    //            sw.Write(bb);
-                    //        }
-                    //        bb = ms.ToArray();
-                    //    }
-                    //}
+                    ICryptoTransform encryptor = aes.CreateEncryptor();
                     bb = encryptor.TransformFinalBlock(bb, 0, bb.Length);
                 }
             }

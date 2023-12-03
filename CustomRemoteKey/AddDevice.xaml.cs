@@ -25,7 +25,6 @@ namespace CustomRemoteKey
     {
         public int code = 0;
         private DeviceProperty property;
-        private string debugCurrentQRData;
         public AddDevice()
         {
             InitializeComponent();
@@ -53,7 +52,6 @@ namespace CustomRemoteKey
                     ipStr += ip + ",";
                 }
                 ipStr += "AccessKey=" + publicKey;
-                debugCurrentQRData = ipStr;
                 var data = qrGen.CreateQrCode(ipStr, QRCodeGenerator.ECCLevel.L);
                 var a = new BitmapByteQRCode(data);
                 QRImg.Source = Util.ToBitmapImage(a.GetGraphic(10));
@@ -79,7 +77,7 @@ namespace CustomRemoteKey
 
         private void QRImg_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            Clipboard.SetText(debugCurrentQRData);
+            //Clipboard.SetText(debugCurrentQRData);
         }
     }
 }
