@@ -8,6 +8,7 @@ using Microsoft.Maui.Controls.Xaml;
 using System.Security.Cryptography;
 using System.Linq;
 using Microsoft.Maui.Animations;
+using Java.Net;
 
 namespace Phone
 {
@@ -27,8 +28,12 @@ namespace Phone
         int tickCount;
 
         public static MainPage Instance { get; private set; }
-        
 
+        Client.Session? CurrentSession = null;
+
+        Timer timer;
+
+        
         public MainPage()
         {
             InitializeComponent();
@@ -72,48 +77,46 @@ namespace Phone
             Client = new TcpClient();
             Client.SendTimeout = 2000;
             Client.ReceiveTimeout = 2000;
-            //new Timer((state) =>
-            //{
-            //    if (IsConnected)
-            //    {
-            //        Dispatcher.Dispatch(() => Title = "Controls - Connected");
-            //        tickCount++;
-            //        try
-            //        {
-            //            if (tickCount  % 10 == 0)
-            //            {
-            //                if (!Client.Connected)
-            //                {
-            //                    IsConnected = false;
-            //                    return;
-            //                }
-            //                Client.Client.Send(Encoding.UTF8.GetBytes("ConTes<EOM>"));
-            //            }
-            //        } catch
-            //        {
-
-            //        }
-            //        return;
-            //    }
-            //    try
-            //    {
-            //        Client.Connect(host, PORT);
-            //        IsConnected = true;
-            //    } catch(Exception ex)
-            //    {
-            //        if (ex.GetType() == typeof(SocketException))
-            //        {
-            //            Dispatcher.Dispatch(() =>
-            //            {
-            //                Title = "Controls - Not Connected";
-            //            });
-            //        }
-            //    }
-                
-            //}, null, new TimeSpan(0), TimeSpan.FromMilliseconds(1000));
+            timer = new Timer((state) =>
+            {
+                if (IsConnected)
+                {
+                    Dispatcher.Dispatch(() => Title = "Controls - Connected");
+                    tickCount++;
+                    try
+                    {
+                        if (tickCount == 10)
+                        {
+                            if (!Client.Connected)
+                            {
+                                IsConnected = false;
+                                return;
+                            }
+                            sendEncryptionData(Encoding.ASCII.GetBytes("ConTes<EOM>"), CurrentSession.AESKey, CurrentSession.AESIV);
+                            tickCount = 0;
+                        }
+                    } catch
+                    {
+                        Debug.WriteLine("Error");
+                    }
+                    return;
+                }
+                //try
+                //{
+                //    Client.Connect(host, PORT);
+                //    IsConnected = true;
+                //} catch (Exception ex)
+                //{
+                //    if (ex.GetType() == typeof(SocketException))
+                //    {
+                //        Dispatcher.Dispatch(() =>
+                //        {
+                //            Title = "Controls - Not Connected";
+                //        });
+                //    }
+                //}
+            }, null, new TimeSpan(0), TimeSpan.FromMilliseconds(1000));
             Instance = this;
-
-            
         }
 
         private void OnConnected(object sender, EventArgs e)
@@ -168,7 +171,8 @@ namespace Phone
             var sendData = new byte[newConnection.Length + encryptedCommonKey.Length];
             Array.Copy(newConnection, sendData, newConnection.Length);
             Array.Copy(encryptedCommonKey, 0, sendData, newConnection.Length, encryptedCommonKey.Length);
-            Client.Client.Send(sendData);
+            //Client.Client.Send(sendData);
+            SendData(sendData);
             byte[] buffer = new byte[CRKConstants.BUFFER_SIZE];
             var received = await Client.Client.ReceiveAsync(buffer, SocketFlags.None);
             if (Encoding.ASCII.GetString(buffer, 0, received) == "OK<EOM>")
@@ -183,6 +187,9 @@ namespace Phone
                 {
                     Navigation.PopToRootAsync();
                 });
+                CurrentSession = new();
+                CurrentSession.AESKey = aesKey;
+                CurrentSession.AESIV = aesIV;
             } else
             {
                 DispAlertFromOtherThread("ERROR", "クライアントに正常に接続できませんでした。\nもう一度やり直してください。", "OK");
@@ -190,7 +197,26 @@ namespace Phone
             }
             return true;
         }
+        /// <summary>
+        /// 先頭にデータサイズを付加し送信します．
+        /// </summary>
+        /// <param name="data">送信するデータのバイト列</param>
+        private void SendData(byte[] data)
+        {
+            if (data.Length > byte.MaxValue) return;
+            byte dataSize = (byte)data.Length;
+            byte[] dataSizeAdded = new byte[dataSize + 1];
+            Array.Copy(data, 0, dataSizeAdded, 1, dataSize);
+            dataSizeAdded[0] = dataSize;
+            Client.Client.Send(dataSizeAdded);
+        }
 
+        /// <summary>
+        /// データを暗号化してサーバーにデータを送信します．
+        /// </summary>
+        /// <param name="data">送信するデータのバイト列</param>
+        /// <param name="key">AES暗号鍵</param>
+        /// <param name="iv">AES初期化ベクトル</param>
         private void sendEncryptionData(byte[] data, byte[] key, byte[] iv)
         {
             using (Aes aes = Aes.Create())
@@ -202,7 +228,7 @@ namespace Phone
                 aes.Padding = PaddingMode.PKCS7;
                 aes.Mode = CipherMode.CBC;
                 ICryptoTransform encryptor = aes.CreateEncryptor();
-                Client.Client.Send(encryptor.TransformFinalBlock(data, 0, data.Length));
+                SendData(encryptor.TransformFinalBlock(data, 0, data.Length));
             }
         }
 
@@ -246,7 +272,6 @@ namespace Phone
                 await Instance.DisplayAlert(title, message, cancel);
             });
         }
-
         private void OnDisconnected(object sender, EventArgs e)
         {
 
@@ -276,24 +301,36 @@ namespace Phone
         {
             HapticFeedback.Default.Perform(HapticFeedbackType.LongPress);
             Button button = (Button)sender;
-            hapticCooldown[Grid.GetColumn(button), Grid.GetRow(button)] = true;
+            int buttonX = Grid.GetColumn(button); int buttonY = Grid.GetRow(button);
+            if (IsConnected)
+            {
+                sendEncryptionData(Encoding.ASCII.GetBytes($"P {buttonX} {buttonY}"), CurrentSession.AESKey, CurrentSession.AESIV);
+            }
+            hapticCooldown[buttonX, buttonY] = true;
             await Task.Delay(100);
-            hapticCooldown[Grid.GetColumn(button),Grid.GetRow(button)] = false;
+            hapticCooldown[buttonX, buttonY] = false;
+            tickCount = 0;
         }
 
         private void ControlButtonUp(object sender, EventArgs e)
         {
             Button button  = (Button)sender;
-            if (!hapticCooldown[Grid.GetColumn(button), Grid.GetRow(button)])
+            int buttonX = Grid.GetColumn(button); int buttonY = Grid.GetRow(button);
+            if (IsConnected)
+            {
+                sendEncryptionData(Encoding.ASCII.GetBytes($"R {buttonX} {buttonY}"), CurrentSession.AESKey, CurrentSession.AESIV);
+            }
+            if (!hapticCooldown[buttonX, buttonY])
                 HapticFeedback.Default.Perform(HapticFeedbackType.Click);
+            tickCount = 0;
         }
 
         private void ContentPage_Disappearing(object sender, EventArgs e)
         {
 #if ANDROID
             DeviceDisplay.Current.KeepScreenOn = false;
-            if (Client.Connected)
-                Client.Close();
+            //if (Client.Connected)
+            //    Client.Close();
 #endif
             Debug.WriteLine("Disappering");
         }

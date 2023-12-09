@@ -19,6 +19,8 @@ namespace CustomRemoteKey.Behaviours
         [JsonIgnore]
         private Button HotKeySettingButton { get; set; }
         [JsonIgnore]
+        private Button SetSpecialKey { get; set; }
+        [JsonIgnore]
         DispatcherTimer timer = new DispatcherTimer();
         private int rendaCount = 0;
         
@@ -49,7 +51,7 @@ namespace CustomRemoteKey.Behaviours
                     HasShift = false;
                     HasWin = false;
                     MainWindow.Instance.IsInHotKeySetting = true;
-                    HotKeySettingButton.Content = "変更中";
+                    HotKeySettingButton.Content = "変更中(もう一度押してキャンセル)";
                 } else
                 {
                     HotKeySettingButton.Content = "ボタンを押して設定変更";
@@ -63,11 +65,13 @@ namespace CustomRemoteKey.Behaviours
                 MainWindow.Instance.IsInHotKeySetting = false;
             };
             setKeyCode(Key);
-            timer.Interval = TimeSpan.FromMilliseconds(10);
+            timer.Interval = TimeSpan.FromMilliseconds(40);
             timer.Tick += (s, e) =>
             {
+                if (HasWin || HasAlt || HasCtrl) 
+                    return;
                 rendaCount++;
-                if (rendaCount > 5)
+                if (rendaCount > 4)
                     SimulateKeydown();
             };
         }
@@ -127,6 +131,86 @@ namespace CustomRemoteKey.Behaviours
         {
             AcceptingKeyInput = false;
             HotKeySettingButton.Content = "ボタンを押して設定変更";
+        }
+
+        public enum SpecialKey
+        {
+            Pause = 0x13,
+
+        }
+
+        public enum NumPad
+        {
+            NUM0 = 0x60,
+            NUM1 = 0x61,
+            NUM2 = 0x62,
+            NUM3 = 0x63,
+            NUM4 = 0x64,
+            NUM5 = 0x65,
+            NUM6 = 0x66,
+            NUM7 = 0x67,
+            NUM8 = 0x68,
+            NUM9 = 0x69,
+            MULTIPLY = 0x6A,
+            ADD = 0x6B,
+            SUBTRACT = 0x6D,
+            DIVIDE = 0x6F
+        }
+
+        public enum FunctionKey
+        {
+            F1 = 0x70,
+            F2 = 0x71,
+            F3 = 0x72,
+            F4 = 0x73,
+            F5 = 0x74,
+            F6 = 0x75,
+            F7 = 0x76,
+            F8 = 0x77,
+            F9 = 0x78,
+            F10 = 0x79,
+            F11 = 0x7A,
+            F12 = 0x7B,
+            F13 = 0x7C,
+            F14 = 0x7D,
+            F15 = 0x7E,
+            F16 = 0x7F,
+            F17 = 0x80,
+            F18 = 0x81,
+            F19 = 0x82,
+            F20 = 0x83,
+            F21 = 0x84,
+            F22 = 0x85,
+            F23 = 0x86,
+            F24 = 0x87,
+        }
+
+        public enum ConsumerKey
+        {
+            MEDIA_RECORD = 0xB2,
+            MEDIA_FAST_FORWARD = 0xB3,
+            MEDIA_REWIND = 0xB4,
+            MEDIA_NEXT = 0xB5,
+            MEDIA_PREVIOUS = 0xB6,
+            MEDIA_STOP = 0xB7,
+            MEDIA_PLAY_PAUSE = 0xCD,
+
+            MEDIA_VOLUME_MUTE = 0xE2,
+            MEDIA_VOLUME_UP = 0xE9,
+            MEDIA_VOLUME_DOWN = 0xEA,
+
+            BRIGHTNESS_UP = 0x006F,
+            BRIGHTNESS_DOWN = 0x0070,
+
+            EMAIL_READER = 0x18A,
+            CALCULATOR = 0x192,
+            EXPLORER = 0x194,
+
+            BROWSER_HOME = 0x223,
+            BROWSER_BACK = 0x224,
+            BROWSER_FORWARD = 0x225,
+            BROWSER_REFRESH = 0x227,
+            BROWSER_BOOKMARKS = 0x22A,
         }
     }
 }

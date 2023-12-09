@@ -16,6 +16,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using Windows.Graphics.Printing.Workflow;
 
 namespace CustomRemoteKey
 {
@@ -141,7 +142,9 @@ namespace CustomRemoteKey
                 newDevice.Id = e.DeviceId;
                 newDevice.Name = e.DeviceName;
                 devices.Add(newDevice);
+                currentDevice++;
                 Dispatcher.Invoke(() => AddNewDevice(newDevice));
+                Dispatcher.Invoke(() => SelectDevice.Content = newDevice.Name);
             };
 
             Instance = this;
@@ -207,6 +210,7 @@ namespace CustomRemoteKey
             }
             if (selectedButtonX < 0 || selectedButtonY < 0) return;
             ProfName.Text = devices[currentDevice].ButtonName[currentProfileMode, selectedButtonX + selectedButtonY * 4];
+            setUISelectionFromBehaviour(devices[currentDevice].Behaviours[currentProfileMode,selectedButtonX + selectedButtonY * 4]);
         }
 
         private Button GetControlButton(int column, int row)
@@ -313,6 +317,26 @@ namespace CustomRemoteKey
             if (firstBehaviour != null && firstBehaviour is InputHotKey)
             {
                 firstBehaviour.OnButtonReleased();
+            }
+        }
+
+        public void HandleButtonPressed(Guid deviceID, int buttonX, int buttonY)
+        {
+            var lookUp = devices.Where(s => s.Id == deviceID).First();
+            var behaviour = lookUp.Behaviours[currentProfileMode, buttonX + buttonY * 4];
+            if (behaviour != null &&behaviour is InputHotKey)
+            {
+                behaviour.OnButtonPressed();
+            }
+        }
+
+        public void HandleButtonReleased(Guid deviceID, int buttonX, int buttonY)
+        {
+            var lookUp = devices.Where(s => s.Id == deviceID).First();
+            var behaviour = lookUp.Behaviours[currentProfileMode, buttonX + buttonY * 4];
+            if (behaviour != null && behaviour is InputHotKey)
+            {
+                behaviour.OnButtonReleased();
             }
         }
     }

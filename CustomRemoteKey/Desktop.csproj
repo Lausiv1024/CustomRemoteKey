@@ -75,6 +75,7 @@
     <Compile Include="Networking\WiFiDirectManager.cs" />
     <Compile Include="Settings.cs" />
     <Compile Include="Native\WinAPI.cs" />
+    <Compile Include="SpecialKeys.cs" />
     <Compile Include="Util.cs" />
     <Page Include="AddDevice.xaml">
       <SubType>Designer</SubType>

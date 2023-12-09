@@ -52,5 +52,14 @@ namespace Phone
             AccessKey = null;
             client.Close();
         }
+
+        public class Session
+        {
+            internal int connectionStage = 0;
+            internal byte[] AESKey;
+            internal byte[] AESIV;
+            internal Guid myGuid;
+            internal string connectedDeviceName;
+        }
     }
 }

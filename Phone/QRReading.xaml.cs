@@ -2,7 +2,6 @@ using Phone.Data;
 using System.Security.Cryptography;
 using CommunityToolkit.Maui.Alerts;
 using CommunityToolkit.Maui.Core;
-using System.Diagnostics.CodeAnalysis;
 
 namespace Phone;
 
@@ -33,7 +32,6 @@ public partial class QRReading : ContentPage
         if (scanned) return;
         scanned = true;
         string scannedText = args.Result[0].Text;
-        Console.WriteLine("Scanned Data : \n{0}", scannedText);
         await Camera.StopCameraAsync();
         Camera.BarCodeDetectionEnabled = false;
         MainThread.BeginInvokeOnMainThread(() =>
@@ -70,7 +68,6 @@ public partial class QRReading : ContentPage
         aes.GenerateIV();
         aes.GenerateKey();
         byte[] keyData = new byte[aes.Key.Length + aes.IV.Length];
-        MainThread.BeginInvokeOnMainThread(() => AESEncryptionData.Text = $"Aes Key : {BitConverter.ToString(aes.Key)}\nAes IV : {BitConverter.ToString(aes.IV)}");
         Array.Copy(aes.Key, 0, keyData, 0, aes.Key.Length);
         Array.Copy(aes.IV, 0, keyData, aes.Key.Length, aes.IV.Length);
         DeviceAddingContext context = DeviceAddingContext.Parse(scannedText);
@@ -84,10 +81,9 @@ public partial class QRReading : ContentPage
             return;
         }
         RSACryptoServiceProvider rsa = new();
-
+        
         rsa.FromXmlString(context.RSAPublicKey);
         byte[] encryptedCommonKey = rsa.Encrypt(keyData, false);
-
         
         if (!await MainPage.Instance.ConnectTo(context.IpAddr, encryptedCommonKey, (byte[])aes.Key.Clone(), (byte[]) aes.IV.Clone()))
         {

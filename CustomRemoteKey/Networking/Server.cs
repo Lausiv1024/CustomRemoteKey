@@ -19,6 +19,7 @@ using System.IO;
 using Windows.ApplicationModel.VoiceCommands;
 using System.Windows.Media.Effects;
 using Windows.Security.Cryptography.Certificates;
+using Windows.Media.Control;
 
 namespace CustomRemoteKey.Networking
 {
@@ -164,98 +165,137 @@ namespace CustomRemoteKey.Networking
 
         internal void HandleData(byte[] buffer, int readSize, StateObject state)
         {
+            if (readSize > 1024) return;
             byte[] bb = new byte[readSize];
             bool isSuccess = false;
             Array.Copy(buffer, bb, readSize);
             var handle = state.workingSocket.Handle;
             string addr = state.workingSocket.RemoteEndPoint.ToString();
-            Console.WriteLine("Handle : {0}", handle);
             string decodedText = string.Empty;
             bool encryptedMode = Sessions.TryGetValue(state.workingSocket.RemoteEndPoint.ToString(), out Session session);
-            Console.WriteLine(BitConverter.ToString(bb));
-            if (encryptedMode && session.ConnectionStage != 0)
+            var datas = splitPackets(bb);
+            foreach ( var data in datas )
             {
-                Console.WriteLine(session);
-                using (Aes aes = Util.CreateDefaultAES(session.AESKey, session.AESIV))
+                //St
+                byte[] willSend = new byte[data.Length];
+                if (encryptedMode && session.ConnectionStage != 0)
                 {
-                    ICryptoTransform decryptor = aes.CreateDecryptor();
+                    Console.WriteLine(session);
+                    using (Aes aes = Util.CreateDefaultAES(session.AESKey, session.AESIV))
+                    {
+                        ICryptoTransform decryptor = aes.CreateDecryptor();
 
-                    decodedText = Encoding.UTF8.GetString(decryptor.TransformFinalBlock(bb, 0, bb.Length));
+                        decodedText = Encoding.UTF8.GetString(decryptor.TransformFinalBlock(data, 0, data.Length));
+                    }
+                } else
+                {
+                    decodedText = Encoding.UTF8.GetString(data);
                 }
-            } else
-            {
-                decodedText = Encoding.UTF8.GetString(bb);
-            }
-            Console.WriteLine("Binary Data : {0}", BitConverter.ToString(bb));
-            if (AcceptingNewConnection && decodedText.IndexOf(NEWCONNECTIONCODE) == 0)
-            {
-                Console.WriteLine("NewConnection Requested");
-                byte[] encryptedData = new byte[readSize - Encoding.ASCII.GetByteCount(NEWCONNECTIONCODE)];
-                Array.Copy(bb, 6, encryptedData, 0, encryptedData.Length);
-                RSACryptoServiceProvider provider = new RSACryptoServiceProvider();
-                provider.FromXmlString(RSAPrivateKey);
-
-                var currentSession = new Session();
-                Sessions.Add(state.workingSocket.RemoteEndPoint.ToString(), currentSession);
-                
-                byte[] aesKeyData;
-                try
+                if (AcceptingNewConnection && decodedText.IndexOf(NEWCONNECTIONCODE) == 0)
                 {
-                    aesKeyData = provider.Decrypt(encryptedData, false);
+                    Console.WriteLine("NewConnection Requested");
+                    byte[] encryptedData = new byte[data.Length - Encoding.ASCII.GetByteCount(NEWCONNECTIONCODE)];
+                    Array.Copy(data, 6, encryptedData, 0, encryptedData.Length);
+                    RSACryptoServiceProvider provider = new RSACryptoServiceProvider();
+                    provider.FromXmlString(RSAPrivateKey);
 
-                    Console.WriteLine("keySize : {0}", aesKeyData.Length);
-                    byte[] key = new byte[CRKConstants.AES_KEYSIZE / 8], iv = new byte[CRKConstants.AES_IVSIZE / 8];
+                    var currentSession = new Session();
+                    Sessions.Add(state.workingSocket.RemoteEndPoint.ToString(), currentSession);
 
-                    Array.Copy(aesKeyData, key, CRKConstants.AES_KEYSIZE / 8);
-                    Array.Copy(aesKeyData, key.Length, iv, 0, CRKConstants.AES_IVSIZE / 8);
+                    byte[] aesKeyData;
+                    try
+                    {
+                        aesKeyData = provider.Decrypt(encryptedData, false);
 
-                    currentSession.AESKey = key;
-                    currentSession.AESIV = iv;
+                        byte[] key = new byte[CRKConstants.AES_KEYSIZE / 8], iv = new byte[CRKConstants.AES_IVSIZE / 8];
 
-                    bb = Encoding.ASCII.GetBytes("OK<EOM>");
-                    isSuccess = true;
+                        Array.Copy(aesKeyData, key, CRKConstants.AES_KEYSIZE / 8);
+                        Array.Copy(aesKeyData, key.Length, iv, 0, CRKConstants.AES_IVSIZE / 8);
 
-                    Console.WriteLine(BitConverter.ToString(aesKeyData));
-                } catch (CryptographicException)
+                        currentSession.AESKey = key;
+                        currentSession.AESIV = iv;
+
+                        willSend = Encoding.ASCII.GetBytes("OK<EOM>");
+                        isSuccess = true;
+                    } catch (CryptographicException)
+                    {
+                        willSend = Encoding.ASCII.GetBytes("ERROR<EOM>");
+                        Console.WriteLine("Failed");
+                    }
+                    if (isSuccess)
+                    {
+                        currentSession.ConnectionStage++;
+                    }
+                } else if (decodedText.IndexOf("DENAME") == 0)
                 {
-                    bb = Encoding.ASCII.GetBytes("ERROR<EOM>");
-                    Console.WriteLine("Failed");
+                    Session current = Sessions[addr];
+                    string deviceName = decodedText.Replace("DENAME", "").Replace("<EOM>", "");
+                    Guid guid = Guid.NewGuid();
+                    OnDeviceAdded?.Invoke(this, new DeviceAddedEventArgs(deviceName, guid));
+                    current.DeviceGUID = guid;
+                    willSend = Encoding.ASCII.GetBytes("OK<EOM>");
+                    current.ConnectionStage++;
+                } else if (decodedText.IndexOf("R") == 0)
+                {
+                    Session current = Sessions[addr];
+                    if (GetCoordinateFromSpaceSeparatedFormat(decodedText, out int x, out int y))
+                        MainWindow.Instance.HandleButtonReleased(current.DeviceGUID, x, y);
+
+                } else if (decodedText.IndexOf("P") == 0)
+                {
+                    Session current = Sessions[addr];
+                    if (GetCoordinateFromSpaceSeparatedFormat(decodedText, out int x, out int y))
+                        MainWindow.Instance.HandleButtonPressed(current.DeviceGUID, x, y);
+                } else if (decodedText == "ConTes<EOM>")
+                {
+                    willSend = Encoding.UTF8.GetBytes("OK<EOM>");
+                } else if (decodedText == "1")
+                {
+                    MainWindow.Instance.HandleButtonPressed();
+                } else if (decodedText == "0")
+                {
+                    MainWindow.Instance.HandleButtonReleased();
+                } else
+                    willSend = Encoding.UTF8.GetBytes("TEST<EOM>");
+
+                if (session != null && session.ConnectionStage != 0)
+                {
+                    using (Aes aes = Util.CreateDefaultAES(session.AESKey, session.AESIV))
+                    {
+                        ICryptoTransform encryptor = aes.CreateEncryptor();
+                        willSend = encryptor.TransformFinalBlock(willSend, 0, willSend.Length);
+                    }
                 }
-                if (isSuccess)
-                {
-                    currentSession.ConnectionStage++;
-                }
+                state.workingSocket.BeginSend(willSend, 0, willSend.Length, 0, new AsyncCallback(WriteCallback), state);
             }
-            else if (decodedText.IndexOf("DENAME") == 0)
+        }
+
+        private bool GetCoordinateFromSpaceSeparatedFormat(string s, out int x, out int y)
+        {
+            var splited = s.Split(' ');
+            bool xSuccess = int.TryParse(splited[1], out x);
+            bool ySuccess = int.TryParse(splited[2], out y);
+            return xSuccess && ySuccess;
+        }
+
+        /// <summary>
+        /// バッファにまとめられたデータを分割する．
+        /// </summary>
+        /// <param name="b"></param>
+        /// <returns></returns>
+        private List<byte[]> splitPackets(byte[] b)
+        {
+            List<byte[]> result = new List<byte[]>();
+            int currentIndex = 0;
+            while (currentIndex < b.Length)
             {
-                Session current = Sessions[addr];
-                string deviceName = decodedText.Replace("DENAME", "").Replace("<EOM>", "");
-                Guid guid = Guid.NewGuid();
-                OnDeviceAdded?.Invoke(this, new DeviceAddedEventArgs(deviceName, guid));
-                current.DeviceGUID = guid;
-                bb = Encoding.ASCII.GetBytes("OK<EOM>");
+                int dataSize = b[currentIndex];
+                byte[] data = new byte[dataSize];
+                Array.Copy(b, currentIndex + 1, data, 0, dataSize);
+                result.Add(data);
+                currentIndex += dataSize + 1;
             }
-            else if (decodedText == "ConTes<EOM>")
-            {
-                bb = Encoding.UTF8.GetBytes("OK<EOM>");
-            } else if (decodedText == "1")
-            {
-                MainWindow.Instance.HandleButtonPressed();
-            } else if (decodedText == "0")
-            {
-                MainWindow.Instance.HandleButtonReleased();
-            } else
-                bb = Encoding.UTF8.GetBytes("TEST<EOM>");
-            
-            if (session != null && session.ConnectionStage != 0)
-            {
-                using (Aes aes = Util.CreateDefaultAES(session.AESKey, session.AESIV))
-                {
-                    ICryptoTransform encryptor = aes.CreateEncryptor();
-                    bb = encryptor.TransformFinalBlock(bb, 0, bb.Length);
-                }
-            }
-            state.workingSocket.BeginSend(bb, 0, bb.Length, 0, new AsyncCallback(WriteCallback), state);
+            return result;
         }
 
         public class StateObject
