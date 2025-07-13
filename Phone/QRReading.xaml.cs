@@ -58,9 +58,8 @@ public partial class QRReading : ContentPage
         //    return;
         //};
 
-        
+        //鍵作成
         var aes = Aes.Create();
-
         aes.BlockSize = CRKConstants.AES_BLOCKSIZE;
         aes.KeySize = CRKConstants.AES_KEYSIZE;
         aes.Mode = CipherMode.CBC;
@@ -68,6 +67,7 @@ public partial class QRReading : ContentPage
         aes.GenerateIV();
         aes.GenerateKey();
         byte[] keyData = new byte[aes.Key.Length + aes.IV.Length];
+        //鍵データを一つの配列にまとめる
         Array.Copy(aes.Key, 0, keyData, 0, aes.Key.Length);
         Array.Copy(aes.IV, 0, keyData, aes.Key.Length, aes.IV.Length);
         DeviceAddingContext context = DeviceAddingContext.Parse(scannedText);

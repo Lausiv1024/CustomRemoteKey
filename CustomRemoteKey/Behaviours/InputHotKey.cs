@@ -30,7 +30,7 @@ namespace CustomRemoteKey.Behaviours
         public bool HasAlt { get; set; }
         public int Key { get; set; }
 
-
+        [JsonIgnore]
         private bool AcceptingKeyInput = false;
         public InputHotKey() : base("CustomHotKey", "ホットキー")
         {

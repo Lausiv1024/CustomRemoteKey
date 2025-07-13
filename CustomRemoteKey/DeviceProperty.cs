@@ -1,4 +1,5 @@
 ﻿using CustomRemoteKey.Behaviours;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,9 +16,9 @@ namespace CustomRemoteKey
         public BehaviourBase[,] Behaviours;
 
         public string[,] ButtonName;
-
+        [JsonIgnore]
         public string PubKeyXML;
-
+        [JsonIgnore]
         public string PrivateKeyXML;
 
         public DeviceProperty()

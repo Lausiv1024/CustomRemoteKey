@@ -91,7 +91,7 @@ namespace CustomRemoteKey.Native
                 var vkCode = (int)kb.vkCode;
                 OnKeyUpEvent(vkCode);
             }
-            return (IntPtr) ignoreInput;
+            return new IntPtr(ignoreInput);
         }
 
         public delegate void KeyEventHandler(object sender, KeyEventArg e);

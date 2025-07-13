@@ -20,6 +20,8 @@ using Windows.ApplicationModel.VoiceCommands;
 using System.Windows.Media.Effects;
 using Windows.Security.Cryptography.Certificates;
 using Windows.Media.Control;
+using System.Windows.Markup;
+using static System.Windows.Forms.AxHost;
 
 namespace CustomRemoteKey.Networking
 {
@@ -40,7 +42,11 @@ namespace CustomRemoteKey.Networking
         //StreamSocket streamSocket;
 
         public event EventHandler<DeviceAddedEventArgs> OnDeviceAdded;
+        /// <summary>
+        /// 新規デバイスの受け入れ状態を示します
+        /// </summary>
         public bool AcceptingNewConnection = false;
+        
         public string currentAccessKey { private get; set; }
 
         private SymmetricAlgorithm symAl;
@@ -52,6 +58,7 @@ namespace CustomRemoteKey.Networking
         private byte[] CurrentAESKey;
         private byte[] currentCurrentAESIV;
         private Dictionary<string, Session> Sessions = new Dictionary<string, Session>();
+        private readonly string OK__ = "OK<EOM>";
 
 
         public bool Closed { get; private set; }
@@ -129,7 +136,8 @@ namespace CustomRemoteKey.Networking
             try
             {
                 readSize = handler.EndReceive(ar);
-            } catch {
+            } catch(Exception ex) {
+                Debug.WriteLine(ex.ToString());
                 return;
             }
             if (readSize < 1)
@@ -162,12 +170,13 @@ namespace CustomRemoteKey.Networking
         }
 
         readonly string NEWCONNECTIONCODE = "NEWCON";
+        readonly string REQUESTKEYCODE = "REQKY";
+        readonly string CONNECTCODE = "CNT";
 
         internal void HandleData(byte[] buffer, int readSize, StateObject state)
         {
             if (readSize > 1024) return;
             byte[] bb = new byte[readSize];
-            bool isSuccess = false;
             Array.Copy(buffer, bb, readSize);
             var handle = state.workingSocket.Handle;
             string addr = state.workingSocket.RemoteEndPoint.ToString();
@@ -191,51 +200,37 @@ namespace CustomRemoteKey.Networking
                 {
                     decodedText = Encoding.UTF8.GetString(data);
                 }
-                if (AcceptingNewConnection && decodedText.IndexOf(NEWCONNECTIONCODE) == 0)
+
+                if (!encryptedMode && decodedText.IndexOf(REQUESTKEYCODE) == 0)
+                {
+                    Util.CreateRSAKeys(out string pub, out string pri);
+                    setPublicEncryptionData(pub, pri);
+                    willSend = Encoding.ASCII.GetBytes(pub);
+                }
+                else if (!encryptedMode && decodedText.IndexOf(CONNECTCODE) == 0)
+                {
+                    willSend = registerDevice(true, data, Encoding.ASCII.GetByteCount(CONNECTCODE), state.workingSocket.RemoteEndPoint.ToString());
+
+                }
+                else if (AcceptingNewConnection && decodedText.IndexOf(NEWCONNECTIONCODE) == 0)
                 {
                     Console.WriteLine("NewConnection Requested");
-                    byte[] encryptedData = new byte[data.Length - Encoding.ASCII.GetByteCount(NEWCONNECTIONCODE)];
-                    Array.Copy(data, 6, encryptedData, 0, encryptedData.Length);
-                    RSACryptoServiceProvider provider = new RSACryptoServiceProvider();
-                    provider.FromXmlString(RSAPrivateKey);
-
-                    var currentSession = new Session();
-                    Sessions.Add(state.workingSocket.RemoteEndPoint.ToString(), currentSession);
-
-                    byte[] aesKeyData;
-                    try
-                    {
-                        aesKeyData = provider.Decrypt(encryptedData, false);
-
-                        byte[] key = new byte[CRKConstants.AES_KEYSIZE / 8], iv = new byte[CRKConstants.AES_IVSIZE / 8];
-
-                        Array.Copy(aesKeyData, key, CRKConstants.AES_KEYSIZE / 8);
-                        Array.Copy(aesKeyData, key.Length, iv, 0, CRKConstants.AES_IVSIZE / 8);
-
-                        currentSession.AESKey = key;
-                        currentSession.AESIV = iv;
-
-                        willSend = Encoding.ASCII.GetBytes("OK<EOM>");
-                        isSuccess = true;
-                    } catch (CryptographicException)
-                    {
-                        willSend = Encoding.ASCII.GetBytes("ERROR<EOM>");
-                        Console.WriteLine("Failed");
-                    }
-                    if (isSuccess)
-                    {
-                        currentSession.ConnectionStage++;
-                    }
+                    willSend = registerDevice(false, data, Encoding.ASCII.GetByteCount(NEWCONNECTIONCODE), state.workingSocket.RemoteEndPoint.ToString());
                 } else if (decodedText.IndexOf("DENAME") == 0)
                 {
                     Session current = Sessions[addr];
                     string deviceName = decodedText.Replace("DENAME", "").Replace("<EOM>", "");
                     Guid guid = Guid.NewGuid();
-                    OnDeviceAdded?.Invoke(this, new DeviceAddedEventArgs(deviceName, guid));
+                    OnDeviceAdded?.Invoke(this, new DeviceAddedEventArgs(deviceName, guid, true));
                     current.DeviceGUID = guid;
                     willSend = Encoding.ASCII.GetBytes("OK<EOM>");
                     current.ConnectionStage++;
-                } else if (decodedText.IndexOf("R") == 0)
+                }
+                else if (decodedText == "D")
+                {
+                    Sessions.Remove(state.workingSocket.RemoteEndPoint.ToString());
+                    willSend = Encoding.ASCII.GetBytes("DSC_OK");
+                }else if (decodedText.IndexOf("R") == 0)
                 {
                     Session current = Sessions[addr];
                     if (GetCoordinateFromSpaceSeparatedFormat(decodedText, out int x, out int y))
@@ -268,6 +263,50 @@ namespace CustomRemoteKey.Networking
                 }
                 state.workingSocket.BeginSend(willSend, 0, willSend.Length, 0, new AsyncCallback(WriteCallback), state);
             }
+        }
+
+        private byte[] registerDevice(bool requireSessionVerification, byte[] data, int headerLength, string endpointStr)
+        {
+            byte[] willSend;
+            bool isSuccess = false;
+            if (requireSessionVerification && !Sessions.ContainsKey(endpointStr))
+            {
+                return Encoding.ASCII.GetBytes("ERROR<EOM>");
+            }
+            byte[] encryptedData = new byte[data.Length - headerLength];
+            Array.Copy(data, headerLength, encryptedData, 0, encryptedData.Length);
+            RSACryptoServiceProvider provider = new RSACryptoServiceProvider();
+            provider.FromXmlString(RSAPrivateKey);
+
+            var currentSession = new Session();
+            Sessions.Add(endpointStr, currentSession);
+
+            byte[] aesKeyData;
+            try
+            {
+                aesKeyData = provider.Decrypt(encryptedData, false);
+
+                byte[] key = new byte[CRKConstants.AES_KEYSIZE / 8], iv = new byte[CRKConstants.AES_IVSIZE / 8];
+
+                Array.Copy(aesKeyData, key, CRKConstants.AES_KEYSIZE / 8);
+                Array.Copy(aesKeyData, key.Length, iv, 0, CRKConstants.AES_IVSIZE / 8);
+
+                currentSession.AESKey = key;
+                currentSession.AESIV = iv;
+
+                willSend = Encoding.ASCII.GetBytes(OK__);
+                isSuccess = true;
+                setPublicEncryptionData(string.Empty, string.Empty);
+            } catch (CryptographicException)
+            {
+                willSend = Encoding.ASCII.GetBytes("ERROR<EOM>");
+                Console.WriteLine("Failed");
+            }
+            if (isSuccess)
+            {
+                currentSession.ConnectionStage++;
+            }
+            return willSend;
         }
 
         private bool GetCoordinateFromSpaceSeparatedFormat(string s, out int x, out int y)
@@ -312,6 +351,10 @@ namespace CustomRemoteKey.Networking
             internal byte[] AESIV;
             internal Guid DeviceGUID;
             internal string DeviceName;
+            /// <summary>
+            /// デバイスが確認されているか
+            /// </summary>
+            public bool IsDeviceVerified { get { return DeviceGUID != null; } }
 
             public override string ToString()
             {

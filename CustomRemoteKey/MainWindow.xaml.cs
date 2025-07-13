@@ -1,9 +1,12 @@
 ﻿using CustomRemoteKey.Behaviours;
 using CustomRemoteKey.Native;
 using CustomRemoteKey.Networking;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -45,8 +48,9 @@ namespace CustomRemoteKey
 
         public List<DeviceProperty> devices = new List<DeviceProperty>();
 
-        readonly KeyboardHook hook;
+        private readonly string DeviceConfigPath = System.IO.Path.Combine(Directory.GetParent(Assembly.GetExecutingAssembly().Location).FullName, "Devices");
 
+        readonly KeyboardHook hook;
         public MainWindow()
         {
             InitializeComponent();
@@ -79,7 +83,6 @@ namespace CustomRemoteKey
                     but.HorizontalAlignment = HorizontalAlignment.Stretch;
                     but.VerticalAlignment = VerticalAlignment.Stretch;
                     but.Margin = new Thickness(10);
-                    
                     but.Click += (s, e) =>
                     {
                         Button button =(Button) s;
@@ -138,13 +141,27 @@ namespace CustomRemoteKey
 
             MainServer.OnDeviceAdded += (s, e) =>
             {
+                if (!e.IsNewDevice)
+                {
+
+                    return;
+                }
+                //新しいデバイスの接続時の処理
                 var newDevice = new DeviceProperty();
                 newDevice.Id = e.DeviceId;
                 newDevice.Name = e.DeviceName;
                 devices.Add(newDevice);
                 currentDevice++;
+
                 Dispatcher.Invoke(() => AddNewDevice(newDevice));
                 Dispatcher.Invoke(() => SelectDevice.Content = newDevice.Name);
+                //if (!Directory.Exists(DeviceConfigPath))
+                //    Directory.CreateDirectory(DeviceConfigPath);
+                //string jsonData = JsonConvert .SerializeObject(newDevice, Formatting.Indented);
+                //using(var sw = new StreamWriter(System.IO.Path.Combine(DeviceConfigPath, newDevice.Id.ToString() + ".json")))
+                //{
+                //    sw.Write(jsonData);
+                //}
             };
 
             Instance = this;

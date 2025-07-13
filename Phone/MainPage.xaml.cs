@@ -2,13 +2,8 @@
 using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text;
-using System;
 using System.Net;
-using Microsoft.Maui.Controls.Xaml;
 using System.Security.Cryptography;
-using System.Linq;
-using Microsoft.Maui.Animations;
-using Java.Net;
 
 namespace Phone
 {
@@ -130,15 +125,49 @@ namespace Phone
             try
             {
                 await client.ConnectAsync(IpFromString(ipAddr), CRKConstants.TCP_PORT);
-            } catch
+            } catch(Exception ex)
             {
                 client.Close();
+                Debug.WriteLine(ex.Message);
                 return null;
             }
             if (IsConnected) client.Close();
             return client;
         }
+
+        private async void disconnect()
+        {
+            if (Client is null)
+                return;
+            if (!Client.Connected || CurrentSession is null)
+                return;
+            string received;
+            if (CurrentSession.connectionStage ==0)
+            {
+                SendData(Encoding.ASCII.GetBytes("D"));
+
+                received = Encoding.ASCII.GetString(await receiveDataAsync());
+            } else
+            {
+                sendEncryptionData(Encoding.ASCII.GetBytes("D"), CurrentSession.AESKey, CurrentSession.AESIV);
+                received = await receiveAndDecryptDataAsync(CurrentSession.AESKey, CurrentSession.AESIV);
+            }
+
+            if (received == "DSC_OK")
+            {
+                Client.Close();
+                CurrentSession = null;
+            }
+        }
         
+        /// <summary>
+        /// 接続要求を送信します
+        /// </summary>
+        /// <param name="ipAddr">接続先IPアドレス</param>
+        /// <param name="encryptedCommonKey">RSAにより暗号化されたAES共通鍵</param>
+        /// <param name="aesKey">AES鍵</param>
+        /// <param name="aesIV">AES初期化ベクトル</param>
+        /// <returns></returns>
         public async Task<bool> ConnectTo(string[] ipAddr, byte[] encryptedCommonKey, byte[] aesKey, byte[] aesIV)
         {
             if (ipAddr == null) return false;
@@ -167,6 +196,8 @@ namespace Phone
                 }
             }
 
+            //デバッグではここの処理が無視されていた．処理がスキップされるなんてことある？
+            //Stage 0-0-C 接続要求And鍵交換
             var newConnection = Encoding.UTF8.GetBytes("NEWCON");
             var sendData = new byte[newConnection.Length + encryptedCommonKey.Length];
             Array.Copy(newConnection, sendData, newConnection.Length);
@@ -175,6 +206,7 @@ namespace Phone
             SendData(sendData);
             byte[] buffer = new byte[CRKConstants.BUFFER_SIZE];
             var received = await Client.Client.ReceiveAsync(buffer, SocketFlags.None);
+            //Stage 0-1-C デバイスの名前の送信と鍵データの登録
             if (Encoding.ASCII.GetString(buffer, 0, received) == "OK<EOM>")
             {
                 string deviceNameCmd = "DENAME" + DeviceInfo.Current.Model + "<EOM>";
@@ -190,6 +222,7 @@ namespace Phone
                 CurrentSession = new();
                 CurrentSession.AESKey = aesKey;
                 CurrentSession.AESIV = aesIV;
+                CurrentSession.connectionStage++;
             } else
             {
                 DispAlertFromOtherThread("ERROR", "クライアントに正常に接続できませんでした。\nもう一度やり直してください。", "OK");
@@ -234,12 +267,8 @@ namespace Phone
 
         private async Task<string> receiveAndDecryptDataAsync(byte[] key,byte[] iv)
         {
-            byte[] buffer = new byte[CRKConstants.BUFFER_SIZE];
-
-            var received = await Client.Client.ReceiveAsync(buffer, SocketFlags.None);
-            byte[] receivedData = new byte[received];
-            Array.Copy(buffer, receivedData, receivedData.Length);
-
+            byte[] receivedData = await receiveDataAsync();
+            
             using (Aes aes = Aes.Create())
             {
                 aes.BlockSize = CRKConstants.AES_BLOCKSIZE;
@@ -254,6 +283,17 @@ namespace Phone
                 return Encoding.UTF8.GetString(decryptor.TransformFinalBlock(receivedData, 0, receivedData.Length));
 
             }
+        }
+
+        private async Task<byte[]> receiveDataAsync()
+        {
+            if (!Client.Connected || CurrentSession is null)
+                return null;
+            byte[] buffer = new byte[CRKConstants.BUFFER_SIZE];
+            var received = await Client.Client.ReceiveAsync(buffer, SocketFlags.None);
+            byte[] receivedData = new byte[received];
+            Array.Copy(buffer, receivedData, receivedData.Length);
+            return receivedData;
         }
 
         IPAddress IpFromString(string ip)
@@ -333,6 +373,17 @@ namespace Phone
             //    Client.Close();
 #endif
             Debug.WriteLine("Disappering");
+        }
+
+        public void OnAppPause()
+        {
+            Debug.WriteLine("OnAppPause");
+            //disconnect();
+        }
+
+        public void OnAppResume()
+        {
+            Debug.WriteLine("OnAppResume");
         }
 
         private void ContentPage_Appearing(object sender, EventArgs e)
